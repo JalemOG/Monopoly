@@ -8,23 +8,23 @@ package models;
 public class Propiedad extends Casilla {
 
     /**
-     * Identificador único de la propiedad[cite: 1].
+     * Identificador único de la propiedad.
      */
     private String identificador;
 
     /**
-     * El valor monetario requerido para que un jugador adquiera esta propiedad[cite: 1].
+     * El valor monetario requerido para que un jugador adquiera esta propiedad.
      */
     private double precioCompra;
 
     /**
-     * El monto que debe pagar cualquier jugador visitante al propietario actual[cite: 1].
+     * El monto que debe pagar cualquier jugador visitante al propietario actual.
      */
     private double alquiler;
 
     /**
      * Referencia al jugador que actualmente posee la propiedad. 
-     * Si es null, significa que la propiedad está disponible para la venta[cite: 1].
+     * Si es null, significa que la propiedad está disponible para la venta.
      */
     private Jugador propietario;
 
@@ -48,7 +48,7 @@ public class Propiedad extends Casilla {
 
     /**
      * Implementación del método polimórfico heredado de Casilla.
-     * Define la evaluación inicial cuando un jugador aterriza en la propiedad[cite: 1].
+     * Define la evaluación inicial cuando un jugador aterriza en la propiedad.
      *
      * @param jugador El objeto Jugador que acaba de aterrizar en la casilla.
      */
@@ -69,7 +69,7 @@ public class Propiedad extends Casilla {
     /**
      * Ejecuta la lógica para asignar la propiedad a un nuevo dueño.
      * Este método será invocado por el Servidor/Banco solo después de recibir 
-     * el comando de confirmación del cliente y validar que el saldo sea suficiente[cite: 1].
+     * el comando de confirmación del cliente y validar que el saldo sea suficiente.
      *
      * @param jugador El jugador que desea adquirir la propiedad.
      * @return true si la compra es exitosa, false si la propiedad ya tiene dueño.
@@ -84,7 +84,7 @@ public class Propiedad extends Casilla {
 
     /**
      * Gestiona la lógica de notificación de cobro cuando un jugador cae en una propiedad ajena.
-     * La modificación real de los saldos la realizará el Servidor generando una Transacción[cite: 1].
+     * La modificación real de los saldos la realizará el Servidor generando una Transacción.
      *
      * @param jugador El jugador visitante que debe pagar la renta.
      */
