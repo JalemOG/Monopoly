@@ -32,7 +32,7 @@ public abstract class Casilla {
     /**
      * Método abstracto fundamental para el polimorfismo del juego.
      * Obliga a todas las clases hijas (Propiedad, CasillaEvento, CasillaEspecial) 
-     * a definir su propio comportamiento cuando un jugador aterriza en ellas[cite: 2].
+     * a definir su propio comportamiento cuando un jugador aterriza en ellas.
      *
      * @param jugador El objeto Jugador que acaba de caer en esta casilla.
      */

@@ -3,28 +3,28 @@ package models;
 /**
  * Clase que representa una casilla de tipo Propiedad en el tablero (Ej. Festivales, Estadios).
  * Hereda de la clase abstracta Casilla, aplicando los conceptos de herencia y polimorfismo.
- * Cumple con la regla de almacenar los atributos financieros mínimos exigidos por el proyecto[cite: 2].
+ * Cumple con la regla de almacenar los atributos financieros mínimos exigidos por el proyecto.
  */
 public class Propiedad extends Casilla {
 
     /**
-     * Identificador único de la propiedad[cite: 2].
+     * Identificador único de la propiedad[cite: 1].
      */
     private String identificador;
 
     /**
-     * El valor monetario requerido para que un jugador adquiera esta propiedad[cite: 2].
+     * El valor monetario requerido para que un jugador adquiera esta propiedad[cite: 1].
      */
     private double precioCompra;
 
     /**
-     * El monto que debe pagar cualquier jugador visitante al propietario actual[cite: 2].
+     * El monto que debe pagar cualquier jugador visitante al propietario actual[cite: 1].
      */
     private double alquiler;
 
     /**
      * Referencia al jugador que actualmente posee la propiedad. 
-     * Si es null, significa que la propiedad está disponible para la venta[cite: 2].
+     * Si es null, significa que la propiedad está disponible para la venta[cite: 1].
      */
     private Jugador propietario;
 
@@ -39,19 +39,16 @@ public class Propiedad extends Casilla {
      * @param alquiler El costo de peaje o renta para los visitantes.
      */
     public Propiedad(String identificador, String nombre, int posicion, double precioCompra, double alquiler) {
-        // Llamada obligatoria al constructor de la clase padre (Casilla)
         super(nombre, posicion);
-        
         this.identificador = identificador;
         this.precioCompra = precioCompra;
         this.alquiler = alquiler;
-        this.propietario = null; // Al iniciar el juego, ninguna propiedad tiene dueño
+        this.propietario = null;
     }
 
     /**
      * Implementación del método polimórfico heredado de Casilla.
-     * Contiene la lógica central de evaluación cuando un jugador aterriza en esta propiedad,
-     * validando estrictamente los tres escenarios descritos en la rúbrica[cite: 2].
+     * Define la evaluación inicial cuando un jugador aterriza en la propiedad[cite: 1].
      *
      * @param jugador El objeto Jugador que acaba de aterrizar en la casilla.
      */
@@ -59,93 +56,74 @@ public class Propiedad extends Casilla {
     public void ejecutarAccion(Jugador jugador) {
         System.out.println("El jugador " + jugador.getNombre() + " ha caído en la propiedad: " + this.nombre);
 
-        // Escenario 1: La propiedad está disponible[cite: 2]
         if (this.propietario == null) {
-            System.out.println("La propiedad está disponible. Precio: $" + this.precioCompra);
-            // Nota: La lógica real de compra se gestionará a través del Servidor y los comandos del Cliente.
-        } 
-        // Escenario 2: La propiedad pertenece al mismo jugador (no paga nada)[cite: 2]
-        else if (this.propietario.getIdentificador().equals(jugador.getIdentificador())) {
+            System.out.println("La propiedad está disponible. Esperando decisión del jugador para comprar...");
+        } else if (this.propietario.getIdentificador().equals(jugador.getIdentificador())) {
             System.out.println("Estás en tu propia propiedad. No se realiza ningún pago.");
-        } 
-        // Escenario 3: La propiedad pertenece a otro jugador (debe pagar alquiler)[cite: 2]
-        else {
-            System.out.println("Esta propiedad pertenece a " + this.propietario.getNombre() + 
-                               ". Debes pagar un alquiler de: $" + this.alquiler);
-            // Nota: La deducción de saldo y la creación de la Transacción la coordinará el Servidor.
+        } else {
+            // Es de otro jugador, se dispara el cobro automáticamente
+            cobrarAlquiler(jugador);
         }
+    }
+
+    /**
+     * Ejecuta la lógica para asignar la propiedad a un nuevo dueño.
+     * Este método será invocado por el Servidor/Banco solo después de recibir 
+     * el comando de confirmación del cliente y validar que el saldo sea suficiente[cite: 1].
+     *
+     * @param jugador El jugador que desea adquirir la propiedad.
+     * @return true si la compra es exitosa, false si la propiedad ya tiene dueño.
+     */
+    public boolean comprar(Jugador jugador) {
+        if (this.propietario == null) {
+            this.propietario = jugador;
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Gestiona la lógica de notificación de cobro cuando un jugador cae en una propiedad ajena.
+     * La modificación real de los saldos la realizará el Servidor generando una Transacción[cite: 1].
+     *
+     * @param jugador El jugador visitante que debe pagar la renta.
+     */
+    public void cobrarAlquiler(Jugador jugador) {
+        System.out.println("Notificación al Banco: " + jugador.getNombre() + 
+                           " debe pagar $" + this.alquiler + 
+                           " a " + this.propietario.getNombre());
     }
 
     // --- GETTERS & SETTERS ---
 
-    /**
-     * Obtiene el identificador único de la propiedad.
-     *
-     * @return Cadena de texto con el identificador.
-     */
     public String getIdentificador() {
         return identificador;
     }
 
-    /**
-     * Modifica el identificador de la propiedad.
-     *
-     * @param identificador El nuevo código a asignar.
-     */
     public void setIdentificador(String identificador) {
         this.identificador = identificador;
     }
 
-    /**
-     * Obtiene el costo de compra de la propiedad.
-     *
-     * @return El precio de compra en formato decimal.
-     */
     public double getPrecioCompra() {
         return precioCompra;
     }
 
-    /**
-     * Modifica el costo de compra de la propiedad.
-     *
-     * @param precioCompra El nuevo precio a asignar.
-     */
     public void setPrecioCompra(double precioCompra) {
         this.precioCompra = precioCompra;
     }
 
-    /**
-     * Obtiene el monto actual del alquiler.
-     *
-     * @return El costo de renta en formato decimal.
-     */
     public double getAlquiler() {
         return alquiler;
     }
 
-    /**
-     * Modifica el monto del alquiler.
-     *
-     * @param alquiler El nuevo costo de renta.
-     */
     public void setAlquiler(double alquiler) {
         this.alquiler = alquiler;
     }
 
-    /**
-     * Obtiene el jugador que es dueño actual de la propiedad.
-     *
-     * @return El objeto Jugador propietario, o null si está disponible.
-     */
     public Jugador getPropietario() {
         return propietario;
     }
 
-    /**
-     * Asigna un nuevo dueño a la propiedad tras una transacción de compra exitosa.
-     *
-     * @param propietario El Jugador que acaba de adquirir la propiedad.
-     */
     public void setPropietario(Jugador propietario) {
         this.propietario = propietario;
     }
