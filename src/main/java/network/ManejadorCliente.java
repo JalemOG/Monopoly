@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import models.Jugador;
 
 /**
  * Hilo independiente encargado de gestionar la comunicación de entrada y salida
@@ -91,10 +92,40 @@ public class ManejadorCliente extends Thread {
                 break;
 
             case "COMPRAR_PROPIEDAD":
-                // ACCIÓN REAL: El banco valida fondos e intenta la compra
-                System.out.println("-> " + nombreJugador + " intenta comprar una propiedad.");
+                // 1. Validar que sea el turno del jugador que intenta comprar[cite: 6]
+                Jugador jugadorEnTurno = servidorPadre.getBanco().getJugadorEnTurno();
+                
+                if (jugadorEnTurno != null && jugadorEnTurno.getIdentificador().equals(this.idRfid)) {
+                    // Extraer en qué casilla está parado actualmente
+                    models.Casilla casillaActual = jugadorEnTurno.getPosicionActual().getValor();
+                    
+                    // Verificar si realmente es una propiedad usando 'instanceof'
+                    if (casillaActual instanceof models.Propiedad) {
+                        models.Propiedad propiedad = (models.Propiedad) casillaActual;
+                        
+                        // Validar fondos y ejecutar el pago al Banco (destino null)
+                        if (servidorPadre.getBanco().procesarPago(jugadorEnTurno, null, propiedad.getPrecioCompra(), "COMPRA_PROPIEDAD")) {
+                            propiedad.comprar(jugadorEnTurno);
+                            jugadorEnTurno.getPropiedadesAdquiridas().agregar(propiedad); // Guardar en su ListaDoble
+                            System.out.println("-> " + nombreJugador + " ha comprado " + propiedad.getNombre());
+                        }
+                    } else {
+                        enviarMensaje("ERROR La casilla actual no es una propiedad comprable.");
+                    }
+                } else {
+                    enviarMensaje("ERROR No es tu turno para comprar.");
+                }
                 break;
 
+            case "TERMINAR_TURNO":
+                // Avanzar el anillo de la Cola Circular al siguiente jugador
+                System.out.println("-> " + nombreJugador + " ha finalizado su turno.");
+                servidorPadre.getBanco().finalizarTurnoActual();
+                
+                // Extraer al nuevo jugador y hacer Broadcast a toda la sala
+                Jugador nuevoJugador = servidorPadre.getBanco().getJugadorEnTurno();
+                servidorPadre.transmitirEstadoTodos("NUEVO_TURNO " + nuevoJugador.getIdentificador());
+                break;
             default:
                 enviarMensaje("ERROR Comando no reconocido por el protocolo.");
                 break;
