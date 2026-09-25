@@ -11,7 +11,7 @@ import models.Casilla;
 /**
  * Entidad centralizadora que administra la lógica oficial de la partida.
  * Cumple con la regla estricta de validar las acciones antes de modificar el estado 
- * del juego, impidiendo que los clientes alteren directamente su información[cite: 5].
+ * del juego, impidiendo que los clientes alteren directamente su información.
  */
 public class Banco {
 
