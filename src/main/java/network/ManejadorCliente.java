@@ -70,6 +70,9 @@ public class ManejadorCliente extends Thread {
         String[] partes = mensaje.split(" ");
         String comando = partes[0].toUpperCase();
 
+        // Extraemos al jugador en turno para validar los candados de seguridad en cada acción
+        models.Jugador enTurno = servidorPadre.getBanco().getJugadorEnTurno();
+
         switch (comando) {
             case "CONECTAR":
                 if (partes.length >= 3) {
@@ -78,36 +81,35 @@ public class ManejadorCliente extends Thread {
                     
                     // ACCIÓN REAL: Inscribir al jugador en la Cola Circular del Banco
                     servidorPadre.getBanco().registrarJugador(nombreJugador, idRfid);
-                    
                     enviarMensaje("BIENVENIDO " + nombreJugador);
                 }
                 break;
 
             case "TIRAR_DADOS":
-                // ACCIÓN REAL: El banco debe validar el turno y mover al jugador
-                System.out.println("-> " + nombreJugador + " ha solicitado tirar los dados.");
-                
-                // Llamamos al motor del juego, pasándole el ID que guardamos al CONECTAR
-                servidorPadre.getBanco().procesarLanzamientoDados(this.idRfid);
+                // Validación estricta: impedir jugar fuera de turno
+                if (enTurno != null && enTurno.getIdentificador().equals(this.idRfid)) {
+                    System.out.println("-> " + nombreJugador + " lanza los dados.");
+                    // ACCIÓN REAL: El banco mueve al jugador y dispara el polimorfismo
+                    servidorPadre.getBanco().procesarLanzamientoDados(this.idRfid);
+                } else {
+                    enviarMensaje("ERROR No es tu turno para lanzar los dados.");
+                }
                 break;
 
             case "COMPRAR_PROPIEDAD":
-                // 1. Validar que sea el turno del jugador que intenta comprar[cite: 6]
-                Jugador jugadorEnTurno = servidorPadre.getBanco().getJugadorEnTurno();
-                
-                if (jugadorEnTurno != null && jugadorEnTurno.getIdentificador().equals(this.idRfid)) {
-                    // Extraer en qué casilla está parado actualmente
-                    models.Casilla casillaActual = jugadorEnTurno.getPosicionActual().getValor();
+                if (enTurno != null && enTurno.getIdentificador().equals(this.idRfid)) {
+                    models.Casilla casillaActual = enTurno.getPosicionActual().getValor();
                     
-                    // Verificar si realmente es una propiedad usando 'instanceof'
                     if (casillaActual instanceof models.Propiedad) {
                         models.Propiedad propiedad = (models.Propiedad) casillaActual;
                         
-                        // Validar fondos y ejecutar el pago al Banco (destino null)
-                        if (servidorPadre.getBanco().procesarPago(jugadorEnTurno, null, propiedad.getPrecioCompra(), "COMPRA_PROPIEDAD")) {
-                            propiedad.comprar(jugadorEnTurno);
-                            jugadorEnTurno.getPropiedadesAdquiridas().agregar(propiedad); // Guardar en su ListaDoble
+                        // Validar fondos e impedir comprar sin saldo suficiente
+                        if (servidorPadre.getBanco().procesarPago(enTurno, null, propiedad.getPrecioCompra(), "COMPRA_PROPIEDAD")) {
+                            propiedad.comprar(enTurno);
+                            enTurno.getPropiedadesAdquiridas().agregar(propiedad);
                             System.out.println("-> " + nombreJugador + " ha comprado " + propiedad.getNombre());
+                        } else {
+                            enviarMensaje("ERROR Saldo insuficiente para realizar la compra.");
                         }
                     } else {
                         enviarMensaje("ERROR La casilla actual no es una propiedad comprable.");
@@ -117,15 +119,29 @@ public class ManejadorCliente extends Thread {
                 }
                 break;
 
-            case "TERMINAR_TURNO":
-                // Avanzar el anillo de la Cola Circular al siguiente jugador
-                System.out.println("-> " + nombreJugador + " ha finalizado su turno.");
-                servidorPadre.getBanco().finalizarTurnoActual();
-                
-                // Extraer al nuevo jugador y hacer Broadcast a toda la sala
-                Jugador nuevoJugador = servidorPadre.getBanco().getJugadorEnTurno();
-                servidorPadre.transmitirEstadoTodos("NUEVO_TURNO " + nuevoJugador.getIdentificador());
+            case "NO_COMPRAR":
+                // Inclusión del comando faltante del protocolo oficial
+                if (enTurno != null && enTurno.getIdentificador().equals(this.idRfid)) {
+                    System.out.println("-> " + nombreJugador + " decidió rechazar la compra.");
+                    enviarMensaje("Compra rechazada. Puedes TERMINAR_TURNO.");
+                } else {
+                    enviarMensaje("ERROR No es tu turno.");
+                }
                 break;
+
+            case "TERMINAR_TURNO":
+                if (enTurno != null && enTurno.getIdentificador().equals(this.idRfid)) {
+                    System.out.println("-> " + nombreJugador + " ha finalizado su turno.");
+                    servidorPadre.getBanco().finalizarTurnoActual();
+                    
+                    // Broadcast del nuevo turno a toda la sala
+                    models.Jugador nuevoJugador = servidorPadre.getBanco().getJugadorEnTurno();
+                    servidorPadre.transmitirEstadoTodos("NUEVO_TURNO " + nuevoJugador.getIdentificador());
+                } else {
+                    enviarMensaje("ERROR No es tu turno para finalizar.");
+                }
+                break;
+
             default:
                 enviarMensaje("ERROR Comando no reconocido por el protocolo.");
                 break;
