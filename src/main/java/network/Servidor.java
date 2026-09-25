@@ -46,7 +46,7 @@ public class Servidor {
 
     private void escucharClientes() {
         try {
-            // CAMBIO: Ahora el ciclo se rompe al alcanzar el límite dinámico
+            // El ciclo se rompe al alcanzar el límite dinámico
             while (jugadoresConectados < limiteJugadores) {
                 
                 System.out.println("Esperando jugador " + (jugadoresConectados + 1) + " de " + limiteJugadores + "...");
