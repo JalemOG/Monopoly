@@ -10,6 +10,7 @@ public class Servidor {
     private ServerSocket socketServidor;
     private Socket[] conexionesClientes;
     private int jugadoresConectados;
+    private Banco banco;
     
     private int limiteJugadores; 
 
@@ -29,6 +30,8 @@ public class Servidor {
         // El arreglo sigue siendo de tamaño máximo 4, aunque sobren espacios si juegan 2.
         this.conexionesClientes = new Socket[4]; 
         this.jugadoresConectados = 0;
+        
+        this.banco = new Banco();
     }
 
     public void iniciar() {
@@ -77,4 +80,6 @@ public class Servidor {
             System.out.println("[BROADCAST a Jugador " + (i+1) + "] -> " + mensaje);
         }
     }
+    
+    public Banco getBanco(){return this.banco;}
 }

@@ -71,22 +71,27 @@ public class ManejadorCliente extends Thread {
 
         switch (comando) {
             case "CONECTAR":
-                // Ej: CONECTAR Productora_A E3F1A2
                 if (partes.length >= 3) {
                     this.nombreJugador = partes[1];
                     this.idRfid = partes[2];
-                    System.out.println("-> Registro exitoso: " + nombreJugador + " [" + idRfid + "]");
+                    
+                    // ACCIÓN REAL: Inscribir al jugador en la Cola Circular del Banco
+                    servidorPadre.getBanco().registrarJugador(nombreJugador, idRfid);
+                    
                     enviarMensaje("BIENVENIDO " + nombreJugador);
                 }
                 break;
 
             case "TIRAR_DADOS":
-                // Aquí el servidor delegaría la acción al Banco para mover al jugador
+                // ACCIÓN REAL: El banco debe validar el turno y mover al jugador
                 System.out.println("-> " + nombreJugador + " ha solicitado tirar los dados.");
+                
+                // Llamamos al motor del juego, pasándole el ID que guardamos al CONECTAR
+                servidorPadre.getBanco().procesarLanzamientoDados(this.idRfid);
                 break;
 
             case "COMPRAR_PROPIEDAD":
-                // Delegar al Banco la lógica de compra
+                // ACCIÓN REAL: El banco valida fondos e intenta la compra
                 System.out.println("-> " + nombreJugador + " intenta comprar una propiedad.");
                 break;
 
