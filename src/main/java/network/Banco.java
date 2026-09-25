@@ -7,6 +7,9 @@ import structures.ColaCircular;
 import structures.ListaEnlazadaDoble;
 import structures.Nodo;
 import models.Casilla;
+import models.CartaEvento;
+import models.CasillaEvento;
+import models.Propiedad;
 
 /**
  * Entidad centralizadora que administra la lógica oficial de la partida.
@@ -39,7 +42,7 @@ public class Banco {
      * Estructura que administra el mazo de la CartasEvento
      */
     
-    private ColaCircular<models.CartaEvento> mazoEventos;
+    private ColaCircular<CartaEvento> mazoEventos;
 
     /**
      * Constructor del Banco.
@@ -62,29 +65,29 @@ public class Banco {
      * de ganancia, pérdida, movimiento y pérdida de turnos.
      */
     private void inicializarMazo() {
-        // 1. Eventos de RECIBIR DINERO[cite: 5]
-        mazoEventos.encolar(new models.CartaEvento("Gira mundial exitosa (Sold Out). Cobra $200.", "GANAR_DINERO", 200));
-        mazoEventos.encolar(new models.CartaEvento("Regalías atrasadas de Apple Music. Cobra $100.", "GANAR_DINERO", 100));
-        mazoEventos.encolar(new models.CartaEvento("Ganas el premio a Mejor Artista del Año. Cobra $300.", "GANAR_DINERO", 300));
+        // 1. Eventos de RECIBIR DINERO
+        mazoEventos.encolar(new CartaEvento("Gira mundial exitosa (Sold Out). Cobra $200.", "GANAR_DINERO", 200));
+        mazoEventos.encolar(new CartaEvento("Regalías atrasadas de Apple Music. Cobra $100.", "GANAR_DINERO", 100));
+        mazoEventos.encolar(new CartaEvento("Ganas el premio a Mejor Artista del Año. Cobra $300.", "GANAR_DINERO", 300));
 
-        // 2. Eventos de PAGAR DINERO[cite: 5]
-        mazoEventos.encolar(new models.CartaEvento("Demanda por derechos de autor (Plagio). Paga $150.", "PERDER_DINERO", 150));
-        mazoEventos.encolar(new models.CartaEvento("Escándalo en el hotel. Paga multa de $50.", "PERDER_DINERO", 50));
+        // 2. Eventos de PAGAR DINERO
+        mazoEventos.encolar(new CartaEvento("Demanda por derechos de autor (Plagio). Paga $150.", "PERDER_DINERO", 150));
+        mazoEventos.encolar(new CartaEvento("Escándalo en el hotel. Paga multa de $50.", "PERDER_DINERO", 50));
 
         // 3. Eventos de AVANZAR POSICIONES
-        mazoEventos.encolar(new models.CartaEvento("Tu sencillo se hace viral en TikTok. Avanza 3 casillas.", "AVANZAR_POSICIONES", 3));
+        mazoEventos.encolar(new CartaEvento("Tu sencillo se hace viral en TikTok. Avanza 3 casillas.", "AVANZAR_POSICIONES", 3));
 
         // 4. Eventos de RETROCEDER POSICIONES
-        mazoEventos.encolar(new models.CartaEvento("Problemas logísticos con tu disquera. Retrocede 2 casillas.", "RETROCEDER_POSICIONES", 2));
+        mazoEventos.encolar(new CartaEvento("Problemas logísticos con tu disquera. Retrocede 2 casillas.", "RETROCEDER_POSICIONES", 2));
 
         // 5. Eventos de PERDER UN TURNO
-        mazoEventos.encolar(new models.CartaEvento("Problemas de voz (Afonía). Pierdes 1 turno de gira.", "PERDER_TURNO", 1));
+        mazoEventos.encolar(new CartaEvento("Problemas de voz (Afonía). Pierdes 1 turno de gira.", "PERDER_TURNO", 1));
 
         // 6. Eventos de IR A UNA CASILLA DETERMINADA
         // Se envía a la casilla 18 (Coachella)
-        mazoEventos.encolar(new models.CartaEvento("Invitación VIP a Coachella. Ve directamente a la casilla 18.", "IR_A_CASILLA", 18));
+        mazoEventos.encolar(new CartaEvento("Invitación VIP a Coachella. Ve directamente a la casilla 18.", "IR_A_CASILLA", 18));
         // Se envía a la casilla 7 (Cancelado en Redes)
-        mazoEventos.encolar(new models.CartaEvento("Te descubren haciendo playback. Ve directamente a Cancelado en Redes (Casilla 7).", "IR_A_CASILLA", 7));
+        mazoEventos.encolar(new CartaEvento("Te descubren haciendo playback. Ve directamente a Cancelado en Redes (Casilla 7).", "IR_A_CASILLA", 7));
     }
 
     /**
@@ -113,31 +116,49 @@ public class Banco {
         models.CartaEvento carta = mazoEventos.desencolar();
         carta.aplicarEfecto(jugador); 
 
-        // 2. Aplicar el efecto según el tipo exigido por la rúbrica
+        // 2. Aplicar el efecto según el tipo exigido
+
         switch (carta.getTipoEfecto()) {
             case "GANAR_DINERO":
                 procesarPago(null, jugador, carta.getValor(), "CARTA_EVENTO"); 
                 break;
-                
             case "PERDER_DINERO":
                 procesarPago(jugador, null, carta.getValor(), "CARTA_EVENTO"); 
                 break;
-                
             case "AVANZAR_POSICIONES":
-            case "RETROCEDER_POSICIONES":
-            case "IR_A_CASILLA":
-                // PRÓXIMO SPRINT: Reutilizaremos el código de movimiento de la Lista Circular
-                System.out.println("Banco: El jugador debe moverse según la carta. (Pendiente por programar el motor de salto)");
+                moverPorEfectoRelativo(jugador, (int) carta.getValor(), true);
                 break;
-                
+            case "RETROCEDER_POSICIONES":
+                moverPorEfectoRelativo(jugador, (int) carta.getValor(), false);
+                break;
+            case "IR_A_CASILLA":
+                moverPorEfectoAbsoluto(jugador, (int) carta.getValor());
+                break;
             case "PERDER_TURNO":
-                // PRÓXIMO SPRINT: Modificaremos un atributo booleano de penalización en el Jugador
-                System.out.println("Banco: " + jugador.getNombre() + " será bloqueado el próximo turno.");
+                jugador.setTurnosCastigo((int) carta.getValor());
+                System.out.println("Banco: " + jugador.getNombre() + " ha sido castigado y perderá " + (int)carta.getValor() + " turno(s).");
                 break;
         }
         
         // 3. Regla obligatoria: Enviar la carta al fondo del mazo
         mazoEventos.encolar(carta);
+    }
+    
+    /**
+     * Evalúa el estado de la propiedad destino. Si tiene dueño, el Banco 
+     * fuerza el traspaso de fondos (simulando la futura lectura RFID obligatoria).
+     * 
+     * @param jugador El jugador que aterrizó en la casilla.
+     * @param propiedad La propiedad que está siendo evaluada.
+     */
+    public void evaluarPropiedad(Jugador jugador, models.Propiedad propiedad) {
+        if (propiedad.getPropietario() == null) {
+            System.out.println("Banco: " + propiedad.getNombre() + " está libre. Esperando comando COMPRAR_PROPIEDAD o NO_COMPRAR de " + jugador.getNombre());
+            // En el futuro, aquí enviaremos el comando ESPERANDO_ACCION al Cliente
+        } else if (!propiedad.getPropietario().getIdentificador().equals(jugador.getIdentificador())) {
+            System.out.println("Banco: Alerta de cobro. Ejecutando PAGO_ALQUILER automático...");
+            procesarPago(jugador, propiedad.getPropietario(), propiedad.getAlquiler(), "PAGO_ALQUILER");
+        }
     }
     
 
@@ -208,10 +229,17 @@ public class Banco {
     public void procesarLanzamientoDados(String idSolicitante) {
         Jugador jugadorActual = turnos.obtenerTurnoActual();
         
-        // 1. Validar que el jugador tenga el turno vigente[cite: 5]
+        // 1. Validar que el jugador tenga el turno vigente
         if (jugadorActual == null || !jugadorActual.getIdentificador().equals(idSolicitante)) {
             System.err.println("Banco rechaza acción: No es el turno de " + idSolicitante);
             return;
+        }
+        
+        // 1.5 Validar si el jugador está cumpliendo un castigo
+        if (jugadorActual.getTurnosCastigo() > 0) {
+            System.err.println("Banco rechaza acción: " + jugadorActual.getNombre() + " está castigado. Debe ceder el turno.");
+            jugadorActual.setTurnosCastigo(jugadorActual.getTurnosCastigo() - 1);
+            return; 
         }
 
         // 2. Simular el resultado de dos dados electrónicos (2 al 12) temporalmente
@@ -243,6 +271,69 @@ public class Banco {
         // 4. Magia del polimorfismo: Ejecutar la acción de la casilla
         // No necesitamos 'if' para saber si es Propiedad o Evento, Java lo sabe.
         casillaDestino.ejecutarAccion(jugadorActual);
+        
+        // 5. Delegación transaccional al Banco
+        if (casillaDestino instanceof Propiedad) {
+            evaluarPropiedad(jugadorActual, (Propiedad) casillaDestino);
+        } else if (casillaDestino instanceof CasillaEvento) {
+            procesarCartaEvento(jugadorActual);
+        }
+    }
+    
+    /**
+     * Mueve al jugador una cantidad específica de casillas hacia adelante o hacia atrás.
+     * Utiliza los enlaces dobles de la Lista Circular[cite: 8].
+     */
+    private void moverPorEfectoRelativo(Jugador jugador, int cantidad, boolean haciaAdelante) {
+        Nodo<Casilla> pos = jugador.getPosicionActual();
+        
+        for (int i = 0; i < cantidad; i++) {
+            if (haciaAdelante) {
+                pos = pos.getSiguiente(); // Avanza a la casilla siguiente
+                if (pos == tablero.getCasillaInicio()) {
+                    procesarPago(null, jugador, 200, "PREMIO_POR_INICIO");
+                }
+            } else {
+                pos = pos.getAnterior(); // Retrocede a la casilla anterior
+            }
+        }
+        finalizarMovimientoPorEfecto(jugador, pos);
+    }
+
+    /**
+     * Mueve al jugador directamente a una casilla objetivo, siempre hacia adelante.
+     */
+    private void moverPorEfectoAbsoluto(Jugador jugador, int casillaDestino) {
+        Nodo<Casilla> pos = jugador.getPosicionActual();
+        
+        // Recorre la lista circular hacia adelante hasta encontrar la posición objetivo
+        while (pos.getValor().getPosicion() != casillaDestino) {
+            pos = pos.getSiguiente();
+            if (pos == tablero.getCasillaInicio()) {
+                procesarPago(null, jugador, 200, "PREMIO_POR_INICIO");
+            }
+        }
+        finalizarMovimientoPorEfecto(jugador, pos);
+    }
+
+    /**
+     * Aplica el cambio de posición y dispara en cadena la acción de la nueva casilla.
+     */
+    private void finalizarMovimientoPorEfecto(Jugador jugador, Nodo<Casilla> nuevaPos) {
+        jugador.setPosicionActual(nuevaPos);
+        Casilla casillaDestino = nuevaPos.getValor();
+        
+        System.out.println("Banco: El efecto de la carta movió a " + jugador.getNombre() + " -> " + casillaDestino.getNombre());
+        
+        // Polimorfismo encadenado: Ejecutar la acción base de la nueva casilla
+        casillaDestino.ejecutarAccion(jugador); 
+        
+        // Delegación transaccional: El banco asume el control del nuevo estado
+        if (casillaDestino instanceof models.Propiedad) {
+            evaluarPropiedad(jugador, (models.Propiedad) casillaDestino);
+        } else if (casillaDestino instanceof models.CasillaEvento) {
+            procesarCartaEvento(jugador);
+        }
     }
 
     /**
