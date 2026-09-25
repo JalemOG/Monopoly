@@ -46,8 +46,8 @@ public class Juego {
         System.out.println("\n=== INICIANDO PRUEBA DEL MOTOR DE JUEGO ===");
         // El Cliente 1 envía el comando a través de los Sockets TCP
         jugador1.enviarComando("TIRAR_DADOS");
-        
-        // Intentemos hacer trampa: El Cliente 2 intenta tirar los dados fuera de su turno
+        jugador1.enviarComando("TERMINAR_TURNO");
+          
         try { Thread.sleep(1000); } catch (InterruptedException e) {}
         jugador2.enviarComando("TIRAR_DADOS");
     }

@@ -34,6 +34,12 @@ public class Banco {
      * Contador interno para registrar el número de turno en cada transacción.
      */
     private int contadorTurnosGlobales;
+    
+    /**
+     * Estructura que administra el mazo de la CartasEvento
+     */
+    
+    private ColaCircular<models.CartaEvento> mazoEventos;
 
     /**
      * Constructor del Banco.
@@ -44,7 +50,41 @@ public class Banco {
         this.turnos = new ColaCircular<>();
         this.historialTransacciones = new ListaEnlazadaDoble<>();
         this.contadorTurnosGlobales = 1;
+        
+        // Inicializar el mazo de cartas
+        this.mazoEventos = new ColaCircular<>();
+        inicializarMazo();
         System.out.println("Banco centralizado inicializado. Tablero ensamblado.");
+    }
+    
+    /**
+     * Inicializa el mazo de cartas de evento, asegurando que existan escenarios 
+     * de ganancia, pérdida, movimiento y pérdida de turnos.
+     */
+    private void inicializarMazo() {
+        // 1. Eventos de RECIBIR DINERO[cite: 5]
+        mazoEventos.encolar(new models.CartaEvento("Gira mundial exitosa (Sold Out). Cobra $200.", "GANAR_DINERO", 200));
+        mazoEventos.encolar(new models.CartaEvento("Regalías atrasadas de Apple Music. Cobra $100.", "GANAR_DINERO", 100));
+        mazoEventos.encolar(new models.CartaEvento("Ganas el premio a Mejor Artista del Año. Cobra $300.", "GANAR_DINERO", 300));
+
+        // 2. Eventos de PAGAR DINERO[cite: 5]
+        mazoEventos.encolar(new models.CartaEvento("Demanda por derechos de autor (Plagio). Paga $150.", "PERDER_DINERO", 150));
+        mazoEventos.encolar(new models.CartaEvento("Escándalo en el hotel. Paga multa de $50.", "PERDER_DINERO", 50));
+
+        // 3. Eventos de AVANZAR POSICIONES
+        mazoEventos.encolar(new models.CartaEvento("Tu sencillo se hace viral en TikTok. Avanza 3 casillas.", "AVANZAR_POSICIONES", 3));
+
+        // 4. Eventos de RETROCEDER POSICIONES
+        mazoEventos.encolar(new models.CartaEvento("Problemas logísticos con tu disquera. Retrocede 2 casillas.", "RETROCEDER_POSICIONES", 2));
+
+        // 5. Eventos de PERDER UN TURNO
+        mazoEventos.encolar(new models.CartaEvento("Problemas de voz (Afonía). Pierdes 1 turno de gira.", "PERDER_TURNO", 1));
+
+        // 6. Eventos de IR A UNA CASILLA DETERMINADA
+        // Se envía a la casilla 18 (Coachella)
+        mazoEventos.encolar(new models.CartaEvento("Invitación VIP a Coachella. Ve directamente a la casilla 18.", "IR_A_CASILLA", 18));
+        // Se envía a la casilla 7 (Cancelado en Redes)
+        mazoEventos.encolar(new models.CartaEvento("Te descubren haciendo playback. Ve directamente a Cancelado en Redes (Casilla 7).", "IR_A_CASILLA", 7));
     }
 
     /**
@@ -60,6 +100,46 @@ public class Banco {
         turnos.encolar(nuevoJugador);
         System.out.println("Banco: Jugador " + nombre + " registrado en la Cola de Turnos.");
     }
+    
+    /**
+     * Extrae la carta superior del mazo, aplica su efecto sobre el jugador 
+     * y la envía al final de la cola para que vuelva a circular
+     * @param jugador aplica efectos a dicho jugador
+     */
+    public void procesarCartaEvento(Jugador jugador) {
+        if (mazoEventos.estaVacia()) return;
+
+        // 1. Tomar la carta superior (Frente de la cola)
+        models.CartaEvento carta = mazoEventos.desencolar();
+        carta.aplicarEfecto(jugador); 
+
+        // 2. Aplicar el efecto según el tipo exigido por la rúbrica
+        switch (carta.getTipoEfecto()) {
+            case "GANAR_DINERO":
+                procesarPago(null, jugador, carta.getValor(), "CARTA_EVENTO"); 
+                break;
+                
+            case "PERDER_DINERO":
+                procesarPago(jugador, null, carta.getValor(), "CARTA_EVENTO"); 
+                break;
+                
+            case "AVANZAR_POSICIONES":
+            case "RETROCEDER_POSICIONES":
+            case "IR_A_CASILLA":
+                // PRÓXIMO SPRINT: Reutilizaremos el código de movimiento de la Lista Circular
+                System.out.println("Banco: El jugador debe moverse según la carta. (Pendiente por programar el motor de salto)");
+                break;
+                
+            case "PERDER_TURNO":
+                // PRÓXIMO SPRINT: Modificaremos un atributo booleano de penalización en el Jugador
+                System.out.println("Banco: " + jugador.getNombre() + " será bloqueado el próximo turno.");
+                break;
+        }
+        
+        // 3. Regla obligatoria: Enviar la carta al fondo del mazo
+        mazoEventos.encolar(carta);
+    }
+    
 
     /**
      * Ejecuta una transferencia de dinero validando previamente que el origen posea 
