@@ -7,12 +7,12 @@ import structures.Nodo;
  * Clase que representa a un participante de la partida de Monopoly.
  * Encapsula el estado financiero, la ubicación física en el tablero y 
  * el inventario de propiedades del jugador, cumpliendo con los 
- * atributos mínimos exigidos por la rúbrica del proyecto[cite: 3].
+ * atributos mínimos exigidos.
  */
 public class Jugador {
 
     /**
-     * Identificador único del jugador, vinculado físicamente a su tarjeta RFID[cite: 3].
+     * Identificador único del jugador, vinculado físicamente a su tarjeta RFID.
      */
     private String identificador;
 
@@ -22,23 +22,29 @@ public class Jugador {
     private String nombre;
 
     /**
-     * Dinero actual disponible. El servidor es el único autorizado para modificarlo[cite: 3].
+     * Dinero actual disponible. El servidor es el único autorizado para modificarlo.
      */
     private double saldo;
 
     /**
-     * Indica si el jugador sigue en la partida (true) o si ha caído en bancarrota/castigo (false)[cite: 3].
+     * Indica si el jugador sigue en la partida (true) o si ha caído en bancarrota/castigo (false).
      */
     private boolean estadoActivo;
+    
+    /**
+     * Indica los turnos de castigo
+     */
+    
+    private int turnosCastigo;
 
     /**
-     * Referencia directa al nodo del tablero donde se encuentra el jugador actualmente[cite: 3].
+     * Referencia directa al nodo del tablero donde se encuentra el jugador actualmente.
      * Permite avanzar o retroceder utilizando los enlaces del nodo.
      */
     private Nodo<Casilla> posicionActual;
 
     /**
-     * Estructura lineal propia que almacena el inventario de propiedades compradas por el jugador[cite: 3].
+     * Estructura lineal propia que almacena el inventario de propiedades compradas por el jugador.
      */
     private ListaEnlazadaDoble<Propiedad> propiedadesAdquiridas;
 
@@ -88,7 +94,7 @@ public class Jugador {
 
     /**
      * Modifica el saldo del jugador. El servidor utilizará este método 
-     * tras validar pagos de alquiler o compras[cite: 3].
+     * tras validar pagos de alquiler o compras.
      *
      * @param saldo El nuevo monto de dinero.
      */
@@ -139,5 +145,21 @@ public class Jugador {
      */
     public ListaEnlazadaDoble<Propiedad> getPropiedadesAdquiridas() {
         return propiedadesAdquiridas;
+    }
+    
+    /**
+     * getter de turnosCastigo
+     * @return turnosCastigo 
+     */
+    public int getTurnosCastigo() {
+        return turnosCastigo;
+    }
+
+    /**
+     * setter de turnoCastigo
+     * @param turnosCastigo 
+     */
+    public void setTurnosCastigo(int turnosCastigo) {
+        this.turnosCastigo = turnosCastigo;
     }
 }
