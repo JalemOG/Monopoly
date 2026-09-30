@@ -219,6 +219,32 @@ public class Banco {
         }
     }
     
+    /**
+     * Extrae la carta superior del mazo, aplica su efecto y la devuelve al fondo.
+     * @param jugador pos la carta pal jugador
+     */
+    public void procesarCartaEvento(Jugador jugador) {
+        if (mazoEventos == null || mazoEventos.estaVacia()) return;
+
+        // 1. Extraer la carta superior
+        models.CartaEvento carta = mazoEventos.desencolar();
+        System.out.println("-> CARTA DE EVENTO: " + carta.getDescripcion());
+
+        // 2. Aplicar el efecto financiero (motor de pagos del Banco)
+        switch (carta.getTipoEfecto()) {
+            case "GANAR_DINERO":
+                procesarPago(null, jugador, carta.getValor(), "ganancia por evento"); // Origen null = Banco
+                break;
+            case "PERDER_DINERO":
+                // Destino null = Banco. Si no puede pagar, procesarPago disparará la bancarrota.
+                procesarPago(jugador, null, carta.getValor(), "pérdida por evento"); 
+                break;
+            // Aquí puedes agregar "avanzar posiciones" o "perder un turno" a futuro
+        }
+        
+        // 3. Regla obligatoria: Enviar al fondo del mazo para su reutilización[cite: 14, 15]
+        mazoEventos.encolar(carta);
+    }
     
     /**
      * Procesa la solicitud de tirar los dados y mover al jugador por el tablero.
