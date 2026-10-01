@@ -5,9 +5,8 @@ import structures.Nodo;
 
 /**
  * Clase que representa a un participante de la partida de Monopoly.
- * Encapsula el estado financiero, la ubicación física en el tablero y 
- * el inventario de propiedades del jugador, cumpliendo con los 
- * atributos mínimos exigidos.
+ * Encapsula el estado financiero, la ubicación física en el tablero, 
+ * el inventario de propiedades del jugador y los bloqueos de turno.
  */
 public class Jugador {
 
@@ -32,10 +31,14 @@ public class Jugador {
     private boolean estadoActivo;
     
     /**
-     * Indica los turnos de castigo
+     * Indica los turnos de castigo acumulados (Ej. al caer en la cárcel o por evento).
      */
-    
     private int turnosCastigo;
+
+    /**
+     * Bandera de control para evitar lanzamientos múltiples de dados en un mismo turno.
+     */
+    private boolean haLanzadoDadosEnTurno;
 
     /**
      * Referencia directa al nodo del tablero donde se encuentra el jugador actualmente.
@@ -61,105 +64,74 @@ public class Jugador {
         this.nombre = nombre;
         this.saldo = saldoInicial;
         this.estadoActivo = true; // Todo jugador inicia activo
+        this.turnosCastigo = 0;
+        this.haLanzadoDadosEnTurno = false; // Al iniciar, tiene permiso para lanzar
         this.posicionActual = casillaInicio;
         this.propiedadesAdquiridas = new ListaEnlazadaDoble<>(); // Se inicializa vacía
     }
 
-    /**
-     * Obtiene el identificador RFID del jugador.
-     *
-     * @return Cadena de texto con el identificador.
-     */
+    // --- GETTERS & SETTERS ---
+
     public String getIdentificador() {
         return identificador;
     }
 
-    /**
-     * Obtiene el nombre del jugador.
-     *
-     * @return Cadena de texto con el nombre.
-     */
     public String getNombre() {
         return nombre;
     }
 
-    /**
-     * Obtiene el saldo actual del jugador.
-     *
-     * @return El monto de dinero disponible.
-     */
     public double getSaldo() {
         return saldo;
     }
 
-    /**
-     * Modifica el saldo del jugador. El servidor utilizará este método 
-     * tras validar pagos de alquiler o compras.
-     *
-     * @param saldo El nuevo monto de dinero.
-     */
     public void setSaldo(double saldo) {
         this.saldo = saldo;
     }
 
-    /**
-     * Verifica si el jugador sigue activo en la partida.
-     *
-     * @return true si está activo, false si fue eliminado o inhabilitado.
-     */
     public boolean isEstadoActivo() {
         return estadoActivo;
     }
 
-    /**
-     * Cambia el estado de actividad del jugador (Ej. al caer en bancarrota).
-     *
-     * @param estadoActivo El nuevo estado (true/false).
-     */
     public void setEstadoActivo(boolean estadoActivo) {
         this.estadoActivo = estadoActivo;
     }
-
-    /**
-     * Obtiene el nodo exacto del tablero donde está posicionado el jugador.
-     *
-     * @return Nodo que contiene la Casilla actual.
-     */
-    public Nodo<Casilla> getPosicionActual() {
-        return posicionActual;
-    }
-
-    /**
-     * Actualiza la ubicación del jugador en el tablero.
-     *
-     * @param posicionActual El nuevo nodo donde aterrizó el jugador.
-     */
-    public void setPosicionActual(Nodo<Casilla> posicionActual) {
-        this.posicionActual = posicionActual;
-    }
-
-    /**
-     * Obtiene el inventario de propiedades del jugador.
-     *
-     * @return ListaEnlazadaDoble con los objetos Propiedad.
-     */
-    public ListaEnlazadaDoble<Propiedad> getPropiedadesAdquiridas() {
-        return propiedadesAdquiridas;
-    }
     
-    /**
-     * getter de turnosCastigo
-     * @return turnosCastigo 
-     */
     public int getTurnosCastigo() {
         return turnosCastigo;
     }
 
-    /**
-     * setter de turnoCastigo
-     * @param turnosCastigo 
-     */
     public void setTurnosCastigo(int turnosCastigo) {
         this.turnosCastigo = turnosCastigo;
+    }
+
+    /**
+     * Verifica si el jugador ya consumió su lanzamiento de dados en el turno actual.
+     *
+     * @return true si ya lanzó los dados, false si aún no lo ha hecho.
+     */
+    public boolean haLanzadoDadosEnTurno() {
+        return haLanzadoDadosEnTurno;
+    }
+
+    /**
+     * Modifica el estado de lanzamiento de dados del jugador.
+     * El Banco utilizará este método para bloquear trampas o reiniciar el permiso.
+     *
+     * @param haLanzadoDadosEnTurno true para bloquear nuevos lanzamientos, false para habilitarlos.
+     */
+    public void setHaLanzadoDadosEnTurno(boolean haLanzadoDadosEnTurno) {
+        this.haLanzadoDadosEnTurno = haLanzadoDadosEnTurno;
+    }
+
+    public Nodo<Casilla> getPosicionActual() {
+        return posicionActual;
+    }
+
+    public void setPosicionActual(Nodo<Casilla> posicionActual) {
+        this.posicionActual = posicionActual;
+    }
+
+    public ListaEnlazadaDoble<Propiedad> getPropiedadesAdquiridas() {
+        return propiedadesAdquiridas;
     }
 }

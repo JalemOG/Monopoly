@@ -105,42 +105,54 @@ public class Banco {
     }
     
     /**
-     * Extrae la carta superior del mazo, aplica su efecto sobre el jugador 
-     * y la envía al final de la cola para que vuelva a circular
-     * @param jugador aplica efectos a dicho jugador
+     * Extrae la carta superior del mazo, imprime su descripción, aplica su efecto 
+     * (financiero, desplazamiento o castigo) y la reinserta al final de la cola circular.
+     * 
+     * @param jugador El jugador que cayó en la casilla de evento.
      */
     public void procesarCartaEvento(Jugador jugador) {
-        if (mazoEventos.estaVacia()) return;
+        if (mazoEventos == null || mazoEventos.estaVacia()) return;
 
-        // 1. Tomar la carta superior (Frente de la cola)
-        models.CartaEvento carta = mazoEventos.desencolar();
+        // 1. Extraer la carta superior (Frente de la cola circular)
+        CartaEvento carta = mazoEventos.desencolar();
+        System.out.println("-> CARTA DE EVENTO EXTRAÍDA: " + carta.getDescripcion());
+        
+        // Ejecución delegada en la propia entidad
         carta.aplicarEfecto(jugador); 
 
-        // 2. Aplicar el efecto según el tipo exigido
-
+        // 2. Procesar la lógica de negocio según el tipo de efecto registrado
         switch (carta.getTipoEfecto()) {
             case "GANAR_DINERO":
                 procesarPago(null, jugador, carta.getValor(), "CARTA_EVENTO"); 
                 break;
+                
             case "PERDER_DINERO":
                 procesarPago(jugador, null, carta.getValor(), "CARTA_EVENTO"); 
                 break;
+                
             case "AVANZAR_POSICIONES":
                 moverPorEfectoRelativo(jugador, (int) carta.getValor(), true);
                 break;
+                
             case "RETROCEDER_POSICIONES":
                 moverPorEfectoRelativo(jugador, (int) carta.getValor(), false);
                 break;
+                
             case "IR_A_CASILLA":
                 moverPorEfectoAbsoluto(jugador, (int) carta.getValor());
                 break;
+                
             case "PERDER_TURNO":
                 jugador.setTurnosCastigo((int) carta.getValor());
-                System.out.println("Banco: " + jugador.getNombre() + " ha sido castigado y perderá " + (int)carta.getValor() + " turno(s).");
+                System.out.println("Banco: " + jugador.getNombre() + " penalizado con " + (int) carta.getValor() + " turno(s) de castigo.");
+                break;
+                
+            default:
+                System.err.println("Banco: Tipo de efecto no reconocido: " + carta.getTipoEfecto());
                 break;
         }
         
-        // 3. Regla obligatoria: Enviar la carta al fondo del mazo
+        // Reencolar la carta al fondo del mazo
         mazoEventos.encolar(carta);
     }
     
@@ -219,32 +231,6 @@ public class Banco {
         }
     }
     
-    /**
-     * Extrae la carta superior del mazo, aplica su efecto y la devuelve al fondo.
-     * @param jugador pos la carta pal jugador
-     */
-    public void procesarCartaEvento(Jugador jugador) {
-        if (mazoEventos == null || mazoEventos.estaVacia()) return;
-
-        // 1. Extraer la carta superior
-        models.CartaEvento carta = mazoEventos.desencolar();
-        System.out.println("-> CARTA DE EVENTO: " + carta.getDescripcion());
-
-        // 2. Aplicar el efecto financiero (motor de pagos del Banco)
-        switch (carta.getTipoEfecto()) {
-            case "GANAR_DINERO":
-                procesarPago(null, jugador, carta.getValor(), "ganancia por evento"); // Origen null = Banco
-                break;
-            case "PERDER_DINERO":
-                // Destino null = Banco. Si no puede pagar, procesarPago disparará la bancarrota.
-                procesarPago(jugador, null, carta.getValor(), "pérdida por evento"); 
-                break;
-            // Aquí puedes agregar "avanzar posiciones" o "perder un turno" a futuro
-        }
-        
-        // 3. Regla obligatoria: Enviar al fondo del mazo para su reutilización[cite: 14, 15]
-        mazoEventos.encolar(carta);
-    }
     
     /**
      * Procesa la solicitud de tirar los dados y mover al jugador por el tablero.
