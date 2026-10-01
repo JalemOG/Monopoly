@@ -11,6 +11,7 @@ import models.CartaEvento;
 import models.CasillaEvento;
 import models.Propiedad;
 
+
 /**
  * Entidad centralizadora que administra la lógica oficial de la partida.
  * Cumple con la regla estricta de validar las acciones antes de modificar el estado 
@@ -43,7 +44,13 @@ public class Banco {
      */
     
     private ColaCircular<CartaEvento> mazoEventos;
+    
+    /**
+     * Límite de turnos
+     */
+    private final int LIMITE_TURNOS = 100;
 
+  
     /**
      * Constructor del Banco.
      * Ensambla las piezas fundamentales instanciando las estructuras de datos lineales propias.
@@ -227,26 +234,75 @@ public class Banco {
     }
     /**
      * Finaliza el turno del jugador actual, reinicia su bandera de lanzamiento, 
-     * rota la cola circular y aumenta el contador global de turnos.
+     * rota la cola circular y vigila si se alcanzó el límite de la partida.
      */
     public void finalizarTurnoActual() {
         Jugador jugadorSaliente = turnos.obtenerTurnoActual();
         if (jugadorSaliente != null) {
-            // Reiniciar la bandera para que pueda lanzar cuando vuelva su turno
             jugadorSaliente.setHaLanzadoDadosEnTurno(false); 
         }
 
         turnos.avanzarTurno();
         contadorTurnosGlobales++;
         
-        Jugador enTurno = turnos.obtenerTurnoActual();
-        if (enTurno != null) {
-            System.out.println("El Banco ha rotado el turno. Ahora juega: " + enTurno.getNombre());
+        // BLOQUE 5: Verificar si se alcanzó el límite máximo de turnos
+        if (contadorTurnosGlobales > LIMITE_TURNOS) {
+            declararGanadorPorPatrimonio();
+        } else {
+            Jugador enTurno = turnos.obtenerTurnoActual();
+            if (enTurno != null) {
+                System.out.println("El Banco ha rotado el turno. Ahora juega: " + enTurno.getNombre());
+            }
         }
     }
     
-    
-    
+    /**
+     * Calcula la riqueza total de cada jugador activo (Efectivo + Valor de Propiedades)
+     * para declarar al ganador definitivo cuando se agota el tiempo del juego.
+     */
+    private void declararGanadorPorPatrimonio() {
+        System.out.println("\n=======================================================");
+        System.out.println("¡LÍMITE DE TURNOS ALCANZADO! Calculando patrimonios...");
+        
+        Jugador ganador = null;
+        double mayorPatrimonio = -1.0;
+        int cantidadActivos = turnos.getTamano();
+        
+        // Recorremos la Cola Circular sin destruirla
+        for (int i = 0; i < cantidadActivos; i++) {
+            Jugador actual = turnos.desencolar();
+            
+            // 1. Patrimonio base: Dinero en efectivo
+            double patrimonioActual = actual.getSaldo();
+            
+            // 2. Patrimonio en bienes raíces: Sumamos el valor de compra de sus propiedades
+            structures.Nodo<models.Propiedad> nodoProp = actual.getPropiedadesAdquiridas().getCabeza();
+            while (nodoProp != null) {
+                patrimonioActual += nodoProp.getValor().getPrecioCompra();
+                nodoProp = nodoProp.getSiguiente();
+            }
+            
+            System.out.println("- Patrimonio de " + actual.getNombre() + ": $" + patrimonioActual);
+            
+            // Evaluar si es el más rico hasta el momento
+            if (patrimonioActual > mayorPatrimonio) {
+                mayorPatrimonio = patrimonioActual;
+                ganador = actual;
+            }
+            
+            // Volvemos a meter al jugador a la cola para mantener la estructura íntegra
+            turnos.encolar(actual);
+        }
+        
+        System.out.println("\n=======================================================");
+        System.out.println("¡FIN DEL JUEGO!");
+        System.out.println("El MAGNATE DE LA INDUSTRIA MUSICAL es: " + ganador.getNombre() + " con un total de $" + mayorPatrimonio);
+        System.out.println("=======================================================");
+        
+        // Generar el TXT final antes de apagar el servidor
+        exportarHistorialTXT();
+        System.exit(0);
+    }
     
     /**
      * Procesa la solicitud de tirar los dados y mover al jugador por el tablero.
@@ -428,8 +484,112 @@ public class Banco {
             System.out.println("El MAGNATE DE LA INDUSTRIA MUSICAL es: " + ganador.getNombre());
             System.out.println("=======================================================");
             
-            // Aquí cerraremos el Servidor en el futuro tras exportar el TXT
+            // Aquí exportamos el .txt y cerramos el Servidor
+            exportarHistorialTXT();
             System.exit(0); 
         }
+    }
+    /**
+     * Exporta el historial completo de transacciones a un archivo de texto plano (.txt).
+     * Cumple con la regla de auditoría y generación de archivo al finalizar la partida.
+     */
+    public void exportarHistorialTXT() {
+        System.out.println("Banco: Generando archivo de auditoría...");
+        
+        try (java.io.PrintWriter writer = new java.io.PrintWriter(new java.io.FileWriter("historial_transacciones.txt"))) {
+            writer.println("=== REPORTE OFICIAL DE TRANSACCIONES - MONOPOLY ===");
+            
+            structures.Nodo<models.Transaccion> actual = historialTransacciones.getCabeza();
+            if (actual == null) {
+                writer.println("No se registraron transacciones en esta partida.");
+            }
+            
+            while (actual != null) {
+                // Utiliza el método toString() formateado que creamos en la clase Transaccion
+                writer.println(actual.getValor().toString());
+                actual = actual.getSiguiente();
+            }
+            
+            System.out.println("Banco: Historial exportado exitosamente a 'historial_transacciones.txt'.");
+        } catch (java.io.IOException e) {
+            System.err.println("Banco: Error al exportar el historial - " + e.getMessage());
+        }
+    }
+
+    /**
+     * Recorre la estructura lineal para buscar las transacciones asociadas a un jugador.
+     * Permite al servidor responder a consultas de red específicas.
+     * 
+     * @param nombreJugador El nombre del jugador a buscar (origen o destino).
+     * @return Cadena de texto formateada con los resultados encontrados.
+     */
+    public String consultarTransaccionesPorJugador(String nombreJugador) {
+        StringBuilder reporte = new StringBuilder();
+        reporte.append("--- Transacciones de ").append(nombreJugador).append(" ---\n");
+        
+        structures.Nodo<models.Transaccion> actual = historialTransacciones.getCabeza();
+        boolean encontradas = false;
+        
+        while (actual != null) {
+            models.Transaccion tx = actual.getValor();
+            if (tx.getOrigen().equalsIgnoreCase(nombreJugador) || tx.getDestino().equalsIgnoreCase(nombreJugador)) {
+                reporte.append(tx.toString()).append("\n");
+                encontradas = true;
+            }
+            actual = actual.getSiguiente();
+        }
+        
+        if (!encontradas) {
+            reporte.append("No se encontraron transacciones para este jugador.\n");
+        }
+        return reporte.toString();
+    }
+
+    /**
+     * Filtra el historial para encontrar todas las operaciones de un mismo tipo.
+     * 
+     * @param tipo El concepto de la operación (Ej. "COMPRA_PROPIEDAD", "PAGO_ALQUILER").
+     * @return Cadena de texto formateada con los resultados.
+     */
+    public String consultarTransaccionesPorTipo(String tipo) {
+        StringBuilder reporte = new StringBuilder();
+        reporte.append("--- Transacciones de tipo: ").append(tipo).append(" ---\n");
+        
+        structures.Nodo<models.Transaccion> actual = historialTransacciones.getCabeza();
+        boolean encontradas = false;
+        
+        while (actual != null) {
+            models.Transaccion tx = actual.getValor();
+            if (tx.getTipo().equalsIgnoreCase(tipo)) {
+                reporte.append(tx.toString()).append("\n");
+                encontradas = true;
+            }
+            actual = actual.getSiguiente();
+        }
+        
+        if (!encontradas) {
+            reporte.append("No se encontraron transacciones de este tipo.\n");
+        }
+        return reporte.toString();
+    }
+
+    /**
+     * Retorna el historial completo desde el registro más antiguo al más reciente.
+     * Extrae todos los datos de la Lista Enlazada Doble en un solo bloque de texto.
+     */
+    public String obtenerHistorialCompleto() {
+        StringBuilder reporte = new StringBuilder();
+        reporte.append("--- HISTORIAL COMPLETO ---\n");
+        
+        structures.Nodo<models.Transaccion> actual = historialTransacciones.getCabeza();
+        if (actual == null) {
+            return "El historial está vacío.";
+        }
+        
+        while (actual != null) {
+            reporte.append(actual.getValor().toString()).append("\n");
+            actual = actual.getSiguiente();
+        }
+        return reporte.toString();
     }
 }
