@@ -220,11 +220,19 @@ public class Banco {
     }
 
     /**
-     * Finaliza el turno del jugador actual, rota la cola circular y aumenta el contador global.
+     * Finaliza el turno del jugador actual, reinicia su bandera de lanzamiento, 
+     * rota la cola circular y aumenta el contador global de turnos.
      */
     public void finalizarTurnoActual() {
+        Jugador jugadorSaliente = turnos.obtenerTurnoActual();
+        if (jugadorSaliente != null) {
+            // Reiniciar la bandera para que pueda lanzar cuando vuelva su turno
+            jugadorSaliente.setHaLanzadoDadosEnTurno(false); 
+        }
+
         turnos.avanzarTurno();
         contadorTurnosGlobales++;
+        
         Jugador enTurno = turnos.obtenerTurnoActual();
         if (enTurno != null) {
             System.out.println("El Banco ha rotado el turno. Ahora juega: " + enTurno.getNombre());
@@ -232,9 +240,11 @@ public class Banco {
     }
     
     
+    
+    
     /**
      * Procesa la solicitud de tirar los dados y mover al jugador por el tablero.
-     * Temporalmente simula el hardware de los dados electrónicos.
+     * Valida que el solicitante posea el turno actual y que no haya tirado previamente.
      * 
      * @param idSolicitante El identificador RFID del cliente que envió el comando.
      */
@@ -246,31 +256,38 @@ public class Banco {
             System.err.println("Banco rechaza acción: No es el turno de " + idSolicitante);
             return;
         }
+
+        // 1.1 Validar que no haya tirado dados previamente en este mismo turno
+        if (jugadorActual.haLanzadoDadosEnTurno()) {
+            System.err.println("Banco rechaza acción: " + jugadorActual.getNombre() + " ya lanzó los dados en este turno.");
+            return;
+        }
         
-        // 1.5 Validar si el jugador está cumpliendo un castigo
+        // 1.2 Validar si el jugador está cumpliendo un castigo
         if (jugadorActual.getTurnosCastigo() > 0) {
             System.err.println("Banco rechaza acción: " + jugadorActual.getNombre() + " está castigado. Debe ceder el turno.");
             jugadorActual.setTurnosCastigo(jugadorActual.getTurnosCastigo() - 1);
+            jugadorActual.setHaLanzadoDadosEnTurno(true); // Se marca como consumido su intento
             return; 
         }
 
-        // 2. Simular el resultado de dos dados electrónicos (2 al 12) temporalmente
+        // Marcar la bandera de lanzamiento como consumida para el turno actual
+        jugadorActual.setHaLanzadoDadosEnTurno(true);
+
+        // 2. Simular el resultado de dos dados electrónicos (2 al 12)
         int resultadoDados = (int)(Math.random() * 11) + 2; 
         System.out.println("Banco: " + jugadorActual.getNombre() + " ha sacado un " + resultadoDados);
-        
-        // Nota para red: Aquí en el futuro transmitiremos RESULTADO_DADOS a los clientes
 
-        // 3. Desplazar al jugador a través de los nodos de la lista circular.
+        // 3. Desplazar al jugador a través de los nodos de la lista circular
         Nodo<Casilla> posicion = jugadorActual.getPosicionActual();
         
         for (int i = 0; i < resultadoDados; i++) {
-            posicion = posicion.getSiguiente(); // Avanzamos al nodo adyacente posterior
+            posicion = posicion.getSiguiente();
             
-            // Regla de inicio: Si al caminar pasa por la cabeza (Inicio), cobra el premio.
+            // Regla de inicio: Si al caminar pasa por el Inicio, cobra el premio
             if (posicion == tablero.getCasillaInicio()) {
                 System.out.println("Banco: " + jugadorActual.getNombre() + " ha pasado por el Inicio. ¡Cobra bono!");
-                // Aquí el banco procesará el pago del premio
-                procesarPago(null, jugadorActual, 200, "premio por pasar por inicio");
+                procesarPago(null, jugadorActual, 200, "PREMIO_POR_INICIO");
             }
         }
         
@@ -280,8 +297,7 @@ public class Banco {
         
         System.out.println("Banco: Nueva posición de " + jugadorActual.getNombre() + " -> " + casillaDestino.getNombre());
 
-        // 4. Magia del polimorfismo: Ejecutar la acción de la casilla
-        // No necesitamos 'if' para saber si es Propiedad o Evento, Java lo sabe.
+        // Ejecutar la acción base de la casilla
         casillaDestino.ejecutarAccion(jugadorActual);
         
         // 5. Delegación transaccional al Banco
