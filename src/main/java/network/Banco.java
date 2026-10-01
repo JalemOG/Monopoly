@@ -175,21 +175,28 @@ public class Banco {
     
 
     /**
-     * Ejecuta una transferencia de dinero validando previamente que el origen posea 
-     * fondos suficientes, cumpliendo con las validaciones mínimas del servidor.
-     * Si la validación es exitosa, genera la Transacción y la guarda en el historial.
-     *
-     * @param origen El jugador que emite el pago.
-     * @param destino El jugador (o "BANCO") que recibe el pago.
-     * @param monto La cantidad a transferir.
-     * @param tipo El concepto de la operación (Ej. "COMPRA_PROPIEDAD").
-     * @return true si el pago se completó, false si el origen no tiene saldo suficiente.
+     * Ejecuta una transferencia de dinero validando los fondos.
+     * Si el origen es nulo, se asume que el Banco Central está inyectando dinero.
+     * Si un jugador no puede pagar, se activa el protocolo de Bancarrota.
      */
     public boolean procesarPago(Jugador origen, Jugador destino, double monto, String tipo) {
+        // Caso A: El Banco le paga a un jugador (origen nulo)
+        if (origen == null) {
+            if (destino != null) {
+                destino.setSaldo(destino.getSaldo() + monto);
+                String idTx = "TXN-" + System.currentTimeMillis();
+                Transaccion nuevaTx = new Transaccion(idTx, contadorTurnosGlobales, tipo, "BANCO CENTRAL", destino.getNombre(), monto, "Inyección de capital");
+                historialTransacciones.agregar(nuevaTx);
+                System.out.println("Banco entregó bono: " + nuevaTx.toString());
+            }
+            return true;
+        }
+
+        // Caso B: Un jugador debe pagar (validamos sus fondos)
         if (origen.getSaldo() < monto) {
-            System.err.println("Banco rechaza transacción: " + origen.getNombre() + " no tiene saldo suficiente.");
-            // Aquí en el futuro se aplicará la regla de bancarrota / eliminación
-            return false;
+            System.err.println("Banco rechaza transacción: " + origen.getNombre() + " no tiene saldo suficiente para pagar $" + monto);
+            declararBancarrota(origen);
+            return false; // El pago falló
         }
 
         // 1. Modificar saldos
@@ -218,7 +225,6 @@ public class Banco {
         
         return true;
     }
-
     /**
      * Finaliza el turno del jugador actual, reinicia su bandera de lanzamiento, 
      * rota la cola circular y aumenta el contador global de turnos.
@@ -381,5 +387,49 @@ public class Banco {
      */
     public Tablero getTablero() {
         return tablero;
+    }
+    
+    /**
+     * Maneja la quiebra absoluta de un jugador.
+     * Inhabilita al jugador, embarga sus propiedades y lo expulsa de la cola de turnos.
+     */
+    private void declararBancarrota(Jugador jugadorQuebrado) {
+        System.out.println("\n¡ALERTA DE BANCARROTA! El jugador " + jugadorQuebrado.getNombre() + " ha sido eliminado.");
+        
+        // 1. Marcar al jugador como inactivo
+        jugadorQuebrado.setEstadoActivo(false);
+
+        // 2. Embargar propiedades: Recorrer su Lista Enlazada Doble y liberarlas
+        structures.Nodo<Propiedad> nodoPropiedad = jugadorQuebrado.getPropiedadesAdquiridas().getCabeza();
+        while (nodoPropiedad != null) {
+            Propiedad prop = nodoPropiedad.getValor();
+            prop.setPropietario(null); // Vuelve a estar disponible en el mercado
+            System.out.println("Banco: La propiedad [" + prop.getNombre() + "] ha sido embargada y vuelve a estar libre.");
+            nodoPropiedad = nodoPropiedad.getSiguiente();
+        }
+        
+        // 3. Extraerlo de la Cola Circular
+        // Como la quiebra siempre ocurre en el turno del jugador que no puede pagar, 
+        // simplemente desencolamos el frente de la fila.
+        turnos.desencolar();
+        
+        // 4. Evaluar condición de victoria
+        evaluarFinDePartida();
+    }
+
+    /**
+     * Verifica si se ha cumplido la condición de victoria por eliminación.
+     */
+    private void evaluarFinDePartida() {
+        if (turnos.getTamano() == 1) {
+            Jugador ganador = turnos.obtenerTurnoActual();
+            System.out.println("\n=======================================================");
+            System.out.println("¡FIN DEL JUEGO! Todos los oponentes han entrado en quiebra.");
+            System.out.println("El MAGNATE DE LA INDUSTRIA MUSICAL es: " + ganador.getNombre());
+            System.out.println("=======================================================");
+            
+            // Aquí cerraremos el Servidor en el futuro tras exportar el TXT
+            System.exit(0); 
+        }
     }
 }
