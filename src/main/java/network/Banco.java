@@ -105,42 +105,54 @@ public class Banco {
     }
     
     /**
-     * Extrae la carta superior del mazo, aplica su efecto sobre el jugador 
-     * y la envía al final de la cola para que vuelva a circular
-     * @param jugador aplica efectos a dicho jugador
+     * Extrae la carta superior del mazo, imprime su descripción, aplica su efecto 
+     * (financiero, desplazamiento o castigo) y la reinserta al final de la cola circular.
+     * 
+     * @param jugador El jugador que cayó en la casilla de evento.
      */
     public void procesarCartaEvento(Jugador jugador) {
-        if (mazoEventos.estaVacia()) return;
+        if (mazoEventos == null || mazoEventos.estaVacia()) return;
 
-        // 1. Tomar la carta superior (Frente de la cola)
-        models.CartaEvento carta = mazoEventos.desencolar();
+        // 1. Extraer la carta superior (Frente de la cola circular)
+        CartaEvento carta = mazoEventos.desencolar();
+        System.out.println("-> CARTA DE EVENTO EXTRAÍDA: " + carta.getDescripcion());
+        
+        // Ejecución delegada en la propia entidad
         carta.aplicarEfecto(jugador); 
 
-        // 2. Aplicar el efecto según el tipo exigido
-
+        // 2. Procesar la lógica de negocio según el tipo de efecto registrado
         switch (carta.getTipoEfecto()) {
             case "GANAR_DINERO":
                 procesarPago(null, jugador, carta.getValor(), "CARTA_EVENTO"); 
                 break;
+                
             case "PERDER_DINERO":
                 procesarPago(jugador, null, carta.getValor(), "CARTA_EVENTO"); 
                 break;
+                
             case "AVANZAR_POSICIONES":
                 moverPorEfectoRelativo(jugador, (int) carta.getValor(), true);
                 break;
+                
             case "RETROCEDER_POSICIONES":
                 moverPorEfectoRelativo(jugador, (int) carta.getValor(), false);
                 break;
+                
             case "IR_A_CASILLA":
                 moverPorEfectoAbsoluto(jugador, (int) carta.getValor());
                 break;
+                
             case "PERDER_TURNO":
                 jugador.setTurnosCastigo((int) carta.getValor());
-                System.out.println("Banco: " + jugador.getNombre() + " ha sido castigado y perderá " + (int)carta.getValor() + " turno(s).");
+                System.out.println("Banco: " + jugador.getNombre() + " penalizado con " + (int) carta.getValor() + " turno(s) de castigo.");
+                break;
+                
+            default:
+                System.err.println("Banco: Tipo de efecto no reconocido: " + carta.getTipoEfecto());
                 break;
         }
         
-        // 3. Regla obligatoria: Enviar la carta al fondo del mazo
+        // Reencolar la carta al fondo del mazo
         mazoEventos.encolar(carta);
     }
     
@@ -163,21 +175,28 @@ public class Banco {
     
 
     /**
-     * Ejecuta una transferencia de dinero validando previamente que el origen posea 
-     * fondos suficientes, cumpliendo con las validaciones mínimas del servidor.
-     * Si la validación es exitosa, genera la Transacción y la guarda en el historial.
-     *
-     * @param origen El jugador que emite el pago.
-     * @param destino El jugador (o "BANCO") que recibe el pago.
-     * @param monto La cantidad a transferir.
-     * @param tipo El concepto de la operación (Ej. "COMPRA_PROPIEDAD").
-     * @return true si el pago se completó, false si el origen no tiene saldo suficiente.
+     * Ejecuta una transferencia de dinero validando los fondos.
+     * Si el origen es nulo, se asume que el Banco Central está inyectando dinero.
+     * Si un jugador no puede pagar, se activa el protocolo de Bancarrota.
      */
     public boolean procesarPago(Jugador origen, Jugador destino, double monto, String tipo) {
+        // Caso A: El Banco le paga a un jugador (origen nulo)
+        if (origen == null) {
+            if (destino != null) {
+                destino.setSaldo(destino.getSaldo() + monto);
+                String idTx = "TXN-" + System.currentTimeMillis();
+                Transaccion nuevaTx = new Transaccion(idTx, contadorTurnosGlobales, tipo, "BANCO CENTRAL", destino.getNombre(), monto, "Inyección de capital");
+                historialTransacciones.agregar(nuevaTx);
+                System.out.println("Banco entregó bono: " + nuevaTx.toString());
+            }
+            return true;
+        }
+
+        // Caso B: Un jugador debe pagar (validamos sus fondos)
         if (origen.getSaldo() < monto) {
-            System.err.println("Banco rechaza transacción: " + origen.getNombre() + " no tiene saldo suficiente.");
-            // Aquí en el futuro se aplicará la regla de bancarrota / eliminación
-            return false;
+            System.err.println("Banco rechaza transacción: " + origen.getNombre() + " no tiene saldo suficiente para pagar $" + monto);
+            declararBancarrota(origen);
+            return false; // El pago falló
         }
 
         // 1. Modificar saldos
@@ -206,13 +225,20 @@ public class Banco {
         
         return true;
     }
-
     /**
-     * Finaliza el turno del jugador actual, rota la cola circular y aumenta el contador global.
+     * Finaliza el turno del jugador actual, reinicia su bandera de lanzamiento, 
+     * rota la cola circular y aumenta el contador global de turnos.
      */
     public void finalizarTurnoActual() {
+        Jugador jugadorSaliente = turnos.obtenerTurnoActual();
+        if (jugadorSaliente != null) {
+            // Reiniciar la bandera para que pueda lanzar cuando vuelva su turno
+            jugadorSaliente.setHaLanzadoDadosEnTurno(false); 
+        }
+
         turnos.avanzarTurno();
         contadorTurnosGlobales++;
+        
         Jugador enTurno = turnos.obtenerTurnoActual();
         if (enTurno != null) {
             System.out.println("El Banco ha rotado el turno. Ahora juega: " + enTurno.getNombre());
@@ -220,9 +246,11 @@ public class Banco {
     }
     
     
+    
+    
     /**
      * Procesa la solicitud de tirar los dados y mover al jugador por el tablero.
-     * Temporalmente simula el hardware de los dados electrónicos.
+     * Valida que el solicitante posea el turno actual y que no haya tirado previamente.
      * 
      * @param idSolicitante El identificador RFID del cliente que envió el comando.
      */
@@ -234,31 +262,38 @@ public class Banco {
             System.err.println("Banco rechaza acción: No es el turno de " + idSolicitante);
             return;
         }
+
+        // 1.1 Validar que no haya tirado dados previamente en este mismo turno
+        if (jugadorActual.haLanzadoDadosEnTurno()) {
+            System.err.println("Banco rechaza acción: " + jugadorActual.getNombre() + " ya lanzó los dados en este turno.");
+            return;
+        }
         
-        // 1.5 Validar si el jugador está cumpliendo un castigo
+        // 1.2 Validar si el jugador está cumpliendo un castigo
         if (jugadorActual.getTurnosCastigo() > 0) {
             System.err.println("Banco rechaza acción: " + jugadorActual.getNombre() + " está castigado. Debe ceder el turno.");
             jugadorActual.setTurnosCastigo(jugadorActual.getTurnosCastigo() - 1);
+            jugadorActual.setHaLanzadoDadosEnTurno(true); // Se marca como consumido su intento
             return; 
         }
 
-        // 2. Simular el resultado de dos dados electrónicos (2 al 12) temporalmente
+        // Marcar la bandera de lanzamiento como consumida para el turno actual
+        jugadorActual.setHaLanzadoDadosEnTurno(true);
+
+        // 2. Simular el resultado de dos dados electrónicos (2 al 12)
         int resultadoDados = (int)(Math.random() * 11) + 2; 
         System.out.println("Banco: " + jugadorActual.getNombre() + " ha sacado un " + resultadoDados);
-        
-        // Nota para red: Aquí en el futuro transmitiremos RESULTADO_DADOS a los clientes
 
-        // 3. Desplazar al jugador a través de los nodos de la lista circular.
+        // 3. Desplazar al jugador a través de los nodos de la lista circular
         Nodo<Casilla> posicion = jugadorActual.getPosicionActual();
         
         for (int i = 0; i < resultadoDados; i++) {
-            posicion = posicion.getSiguiente(); // Avanzamos al nodo adyacente posterior
+            posicion = posicion.getSiguiente();
             
-            // Regla de inicio: Si al caminar pasa por la cabeza (Inicio), cobra el premio.
+            // Regla de inicio: Si al caminar pasa por el Inicio, cobra el premio
             if (posicion == tablero.getCasillaInicio()) {
                 System.out.println("Banco: " + jugadorActual.getNombre() + " ha pasado por el Inicio. ¡Cobra bono!");
-                // Aquí el banco procesará el pago del premio
-                procesarPago(null, jugadorActual, 200, "premio por pasar por inicio");
+                procesarPago(null, jugadorActual, 200, "PREMIO_POR_INICIO");
             }
         }
         
@@ -268,8 +303,7 @@ public class Banco {
         
         System.out.println("Banco: Nueva posición de " + jugadorActual.getNombre() + " -> " + casillaDestino.getNombre());
 
-        // 4. Magia del polimorfismo: Ejecutar la acción de la casilla
-        // No necesitamos 'if' para saber si es Propiedad o Evento, Java lo sabe.
+        // Ejecutar la acción base de la casilla
         casillaDestino.ejecutarAccion(jugadorActual);
         
         // 5. Delegación transaccional al Banco
@@ -353,5 +387,49 @@ public class Banco {
      */
     public Tablero getTablero() {
         return tablero;
+    }
+    
+    /**
+     * Maneja la quiebra absoluta de un jugador.
+     * Inhabilita al jugador, embarga sus propiedades y lo expulsa de la cola de turnos.
+     */
+    private void declararBancarrota(Jugador jugadorQuebrado) {
+        System.out.println("\n¡ALERTA DE BANCARROTA! El jugador " + jugadorQuebrado.getNombre() + " ha sido eliminado.");
+        
+        // 1. Marcar al jugador como inactivo
+        jugadorQuebrado.setEstadoActivo(false);
+
+        // 2. Embargar propiedades: Recorrer su Lista Enlazada Doble y liberarlas
+        structures.Nodo<Propiedad> nodoPropiedad = jugadorQuebrado.getPropiedadesAdquiridas().getCabeza();
+        while (nodoPropiedad != null) {
+            Propiedad prop = nodoPropiedad.getValor();
+            prop.setPropietario(null); // Vuelve a estar disponible en el mercado
+            System.out.println("Banco: La propiedad [" + prop.getNombre() + "] ha sido embargada y vuelve a estar libre.");
+            nodoPropiedad = nodoPropiedad.getSiguiente();
+        }
+        
+        // 3. Extraerlo de la Cola Circular
+        // Como la quiebra siempre ocurre en el turno del jugador que no puede pagar, 
+        // simplemente desencolamos el frente de la fila.
+        turnos.desencolar();
+        
+        // 4. Evaluar condición de victoria
+        evaluarFinDePartida();
+    }
+
+    /**
+     * Verifica si se ha cumplido la condición de victoria por eliminación.
+     */
+    private void evaluarFinDePartida() {
+        if (turnos.getTamano() == 1) {
+            Jugador ganador = turnos.obtenerTurnoActual();
+            System.out.println("\n=======================================================");
+            System.out.println("¡FIN DEL JUEGO! Todos los oponentes han entrado en quiebra.");
+            System.out.println("El MAGNATE DE LA INDUSTRIA MUSICAL es: " + ganador.getNombre());
+            System.out.println("=======================================================");
+            
+            // Aquí cerraremos el Servidor en el futuro tras exportar el TXT
+            System.exit(0); 
+        }
     }
 }
