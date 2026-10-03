@@ -77,7 +77,7 @@ public class Cliente {
             System.out.println("Conexión exitosa con el servidor en " + ipServidor);
 
             // 3. Enviar el primer comando del protocolo
-            enviarComando("CONECTAR " + nombreJugador + " " + idRfid);ó
+            enviarComando("CONECTAR " + nombreJugador + " " + idRfid);
                     
             hardware = new rfid.ConexionSerial(this);
             hardware.iniciarConexion();

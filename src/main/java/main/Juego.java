@@ -2,6 +2,7 @@ package main;
 
 import network.Cliente;
 import network.Servidor;
+import com.fazecast.jSerialComm.SerialPort;
 
 /**
  * Clase principal que arranca el Monopoly Distribuido.
@@ -11,6 +12,20 @@ import network.Servidor;
 public class Juego {
 
     public static void main(String[] args) {
+        
+        System.out.println("=== ESCANEANDO PUERTOS USB ===");
+        SerialPort[] puertosDisponibles = SerialPort.getCommPorts();
+
+        if (puertosDisponibles.length == 0) {
+            System.out.println("❌ Java NO detectó ningún puerto serial conectado.");
+        } else {
+            System.out.println("✅ Java detectó " + puertosDisponibles.length + " puerto(s):");
+            for (SerialPort puerto : puertosDisponibles) {
+                System.out.println("- Puerto: " + puerto.getSystemPortName());
+                System.out.println("  Descripción: " + puerto.getDescriptivePortName());
+            }
+        }
+        System.out.println("==============================\n");
         
         System.out.println("=== INICIANDO SISTEMA MONOPOLY ===");
 
