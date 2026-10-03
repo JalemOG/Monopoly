@@ -29,6 +29,11 @@ public class Cliente {
      * El objeto nativo de Java que representa la conexión física con el servidor.
      */
     private Socket socket;
+    
+    /**
+     * Conexión Serial
+     */
+    private rfid.ConexionSerial hardware;
 
     /**
      * Tubería de entrada para leer los comandos que envía el Servidor (Ej. NUEVO_TURNO).
@@ -72,8 +77,11 @@ public class Cliente {
             System.out.println("Conexión exitosa con el servidor en " + ipServidor);
 
             // 3. Enviar el primer comando del protocolo
-            enviarComando("CONECTAR " + nombreJugador + " " + idRfid);
-
+            enviarComando("CONECTAR " + nombreJugador + " " + idRfid);ó
+                    
+            hardware = new rfid.ConexionSerial(this);
+            hardware.iniciarConexion();
+            
             // 4. Iniciar el hilo de escucha continua para no bloquear la interfaz del jugador
             recibirActualizacion();
 
@@ -111,8 +119,15 @@ public class Cliente {
                 while ((mensajeServidor = entrada.readLine()) != null) {
                     System.out.println("[Servidor dice] -> " + mensajeServidor);
                     
-                    // Aquí, más adelante, conectaremos esto con la Interfaz Gráfica (GUI)
-                    // procesarMensajeServidor(mensajeServidor);
+                    // Si el servidor anuncia el resultado de los dados, encendemos el hardware físico
+                    if (mensajeServidor.startsWith("RESULTADO_DADOS")) {
+                        // Ej. RESULTADO_DADOS RFID_A1B2 8
+                        String[] partes = mensajeServidor.split(" ");
+                        if (partes.length == 3) {
+                            int valor = Integer.parseInt(partes[2]);
+                            hardware.encenderDisplay(valor);
+                        }
+                    }
                 }
             } catch (IOException e) {
                 System.err.println("Se ha perdido la conexión con el servidor.");
