@@ -64,13 +64,13 @@ public class ManejadorCliente extends Thread {
     }
 
     /**
-     * Analiza el mensaje recibido en base al Protocolo de Texto.
+     * Analiza el mensaje recibido en base al Protocolo de Texto del Monopoly.
      */
     private void procesarComando(String mensaje) {
         String[] partes = mensaje.split(" ");
         String comando = partes[0].toUpperCase();
 
-        // Extraemos al jugador en turno para validar los candados de seguridad en cada acción
+        // Extraemos al jugador en turno para validar los candados de seguridad
         models.Jugador enTurno = servidorPadre.getBanco().getJugadorEnTurno();
 
         switch (comando) {
@@ -79,17 +79,16 @@ public class ManejadorCliente extends Thread {
                     this.nombreJugador = partes[1];
                     this.idRfid = partes[2];
                     
-                    // ACCIÓN REAL: Inscribir al jugador en la Cola Circular del Banco
+                    // Delega al Banco la inscripción oficial
                     servidorPadre.getBanco().registrarJugador(nombreJugador, idRfid);
                     enviarMensaje("BIENVENIDO " + nombreJugador);
                 }
                 break;
 
             case "TIRAR_DADOS":
-                // Validación estricta: impedir jugar fuera de turno
+                // Candado: Solo lanza si es su turno
                 if (enTurno != null && enTurno.getIdentificador().equals(this.idRfid)) {
                     System.out.println("-> " + nombreJugador + " lanza los dados.");
-                    // ACCIÓN REAL: El banco mueve al jugador y dispara el polimorfismo
                     servidorPadre.getBanco().procesarLanzamientoDados(this.idRfid);
                 } else {
                     enviarMensaje("ERROR No es tu turno para lanzar los dados.");
@@ -103,7 +102,7 @@ public class ManejadorCliente extends Thread {
                     if (casillaActual instanceof models.Propiedad) {
                         models.Propiedad propiedad = (models.Propiedad) casillaActual;
                         
-                        // Validar fondos e impedir comprar sin saldo suficiente
+                        // Valida fondos y ejecuta el pago (El Banco Central es el destino, por ende es null)
                         if (servidorPadre.getBanco().procesarPago(enTurno, null, propiedad.getPrecioCompra(), "COMPRA_PROPIEDAD")) {
                             propiedad.comprar(enTurno);
                             enTurno.getPropiedadesAdquiridas().agregar(propiedad);
@@ -112,7 +111,7 @@ public class ManejadorCliente extends Thread {
                             enviarMensaje("ERROR Saldo insuficiente para realizar la compra.");
                         }
                     } else {
-                        enviarMensaje("ERROR La casilla actual no es una propiedad comprable.");
+                        enviarMensaje("ERROR La casilla actual no es comprable.");
                     }
                 } else {
                     enviarMensaje("ERROR No es tu turno para comprar.");
@@ -120,12 +119,26 @@ public class ManejadorCliente extends Thread {
                 break;
 
             case "NO_COMPRAR":
-                // Inclusión del comando faltante del protocolo oficial
                 if (enTurno != null && enTurno.getIdentificador().equals(this.idRfid)) {
-                    System.out.println("-> " + nombreJugador + " decidió rechazar la compra.");
+                    System.out.println("-> " + nombreJugador + " rechazó la compra. Turno libre para finalizar.");
                     enviarMensaje("Compra rechazada. Puedes TERMINAR_TURNO.");
                 } else {
                     enviarMensaje("ERROR No es tu turno.");
+                }
+                break;
+
+            case "CONFIRMAR_PAGO":
+                // Llega desde el hardware cuando se escanea el lector RFID RC522
+                if (partes.length >= 2) {
+                    String rfidEscaneado = partes[1];
+                    if (enTurno != null && enTurno.getIdentificador().equals(rfidEscaneado)) {
+                        System.out.println("-> Hardware RFID validado para el jugador: " + rfidEscaneado);
+                        enviarMensaje("PAGO_APROBADO");
+                        // NOTA: Las deducciones ya las hizo el Banco en evaluarPropiedad(),
+                        // esto valida el requisito físico de la rúbrica.
+                    } else {
+                        enviarMensaje("ERROR Tarjeta incorrecta o no es tu turno.");
+                    }
                 }
                 break;
 
@@ -134,12 +147,20 @@ public class ManejadorCliente extends Thread {
                     System.out.println("-> " + nombreJugador + " ha finalizado su turno.");
                     servidorPadre.getBanco().finalizarTurnoActual();
                     
-                    // Broadcast del nuevo turno a toda la sala
+                    // Extrae al nuevo jugador y hace Broadcast a toda la sala
                     models.Jugador nuevoJugador = servidorPadre.getBanco().getJugadorEnTurno();
-                    servidorPadre.transmitirEstadoTodos("NUEVO_TURNO " + nuevoJugador.getIdentificador());
+                    if (nuevoJugador != null) {
+                        servidorPadre.transmitirEstadoTodos("NUEVO_TURNO " + nuevoJugador.getIdentificador());
+                    }
                 } else {
                     enviarMensaje("ERROR No es tu turno para finalizar.");
                 }
+                break;
+
+            case "CONSULTAR_TRANSACCIONES":
+                // Ejecuta la búsqueda en el historial doblemente enlazado
+                String reporte = servidorPadre.getBanco().consultarTransaccionesPorJugador(this.nombreJugador);
+                enviarMensaje(reporte);
                 break;
 
             default:
