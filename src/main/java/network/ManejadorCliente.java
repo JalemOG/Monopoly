@@ -85,16 +85,6 @@ public class ManejadorCliente extends Thread {
                 }
                 break;
 
-            case "TIRAR_DADOS":
-                // Candado: Solo lanza si es su turno
-                if (enTurno != null && enTurno.getIdentificador().equals(this.idRfid)) {
-                    System.out.println("-> " + nombreJugador + " lanza los dados.");
-                    servidorPadre.getBanco().procesarLanzamientoDados(this.idRfid);
-                } else {
-                    enviarMensaje("ERROR No es tu turno para lanzar los dados.");
-                }
-                break;
-
             case "COMPRAR_PROPIEDAD":
                 if (enTurno != null && enTurno.getIdentificador().equals(this.idRfid)) {
                     models.Casilla casillaActual = enTurno.getPosicionActual().getValor();
@@ -124,21 +114,6 @@ public class ManejadorCliente extends Thread {
                     enviarMensaje("Compra rechazada. Puedes TERMINAR_TURNO.");
                 } else {
                     enviarMensaje("ERROR No es tu turno.");
-                }
-                break;
-
-            case "CONFIRMAR_PAGO":
-                // Llega desde el hardware cuando se escanea el lector RFID RC522
-                if (partes.length >= 2) {
-                    String rfidEscaneado = partes[1];
-                    if (enTurno != null && enTurno.getIdentificador().equals(rfidEscaneado)) {
-                        System.out.println("-> Hardware RFID validado para el jugador: " + rfidEscaneado);
-                        enviarMensaje("PAGO_APROBADO");
-                        // NOTA: Las deducciones ya las hizo el Banco en evaluarPropiedad(),
-                        // esto valida el requisito físico de la rúbrica.
-                    } else {
-                        enviarMensaje("ERROR Tarjeta incorrecta o no es tu turno.");
-                    }
                 }
                 break;
 
