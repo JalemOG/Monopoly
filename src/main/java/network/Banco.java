@@ -17,55 +17,38 @@ import models.Propiedad;
  * Cumple con la regla estricta de validar las acciones antes de modificar el estado 
  * del juego, impidiendo que los clientes alteren directamente su información.
  */
+import rfid.ConexionSerial; // Importación obligatoria del hardware
+
 public class Banco {
 
-    /**
-     * El tablero oficial del juego (Lista Circular Doblemente Enlazada de 24 casillas).
-     */
     private Tablero tablero;
-
-    /**
-     * Estructura que administra el ciclo infinito de turnos de los jugadores activos.
-     */
     private ColaCircular<Jugador> turnos;
-
-    /**
-     * Estructura lineal bidireccional que almacena la auditoría completa de los movimientos financieros.
-     */
     private ListaEnlazadaDoble<Transaccion> historialTransacciones;
-
-    /**
-     * Contador interno para registrar el número de turno en cada transacción.
-     */
     private int contadorTurnosGlobales;
-    
-    /**
-     * Estructura que administra el mazo de la CartasEvento
-     */
-    
     private ColaCircular<CartaEvento> mazoEventos;
-    
-    /**
-     * Límite de turnos
-     */
     private final int LIMITE_TURNOS = 100;
+    private Jugador deudorPendiente;
+    private Jugador acreedorPendiente;
+    private double montoPendiente;
 
-  
-    /**
-     * Constructor del Banco.
-     * Ensambla las piezas fundamentales instanciando las estructuras de datos lineales propias.
-     */
+    
+    // EL BANCO ES DUEÑO DEL CAJERO FÍSICO
+    private ConexionSerial cajeroFisico;
+
     public Banco() {
         this.tablero = new Tablero();
         this.turnos = new ColaCircular<>();
         this.historialTransacciones = new ListaEnlazadaDoble<>();
         this.contadorTurnosGlobales = 1;
-        
-        // Inicializar el mazo de cartas
         this.mazoEventos = new ColaCircular<>();
         inicializarMazo();
+        
         System.out.println("Banco centralizado inicializado. Tablero ensamblado.");
-    }
+        
+        // El Banco enciende y se apodera del puerto Serial al nacer
+        this.cajeroFisico = new ConexionSerial(this);
+        this.cajeroFisico.iniciarConexion();
+    }   
     
     /**
      * Inicializa el mazo de cartas de evento, asegurando que existan escenarios 
@@ -170,13 +153,15 @@ public class Banco {
      * @param jugador El jugador que aterrizó en la casilla.
      * @param propiedad La propiedad que está siendo evaluada.
      */
-    public void evaluarPropiedad(Jugador jugador, models.Propiedad propiedad) {
+    public void evaluarPropiedad(Jugador jugador, Propiedad propiedad) {
         if (propiedad.getPropietario() == null) {
             System.out.println("Banco: " + propiedad.getNombre() + " está libre. Esperando comando COMPRAR_PROPIEDAD o NO_COMPRAR de " + jugador.getNombre());
-            // En el futuro, aquí enviaremos el comando ESPERANDO_ACCION al Cliente
         } else if (!propiedad.getPropietario().getIdentificador().equals(jugador.getIdentificador())) {
-            System.out.println("Banco: Alerta de cobro. Ejecutando PAGO_ALQUILER automático...");
-            procesarPago(jugador, propiedad.getPropietario(), propiedad.getAlquiler(), "PAGO_ALQUILER");
+
+            System.out.println("Banco: Alerta de cobro. ¡Acerca tu tarjeta RFID al Cajero para pagar $" + propiedad.getAlquiler() + "!");
+            this.deudorPendiente = jugador;
+            this.acreedorPendiente = propiedad.getPropietario();
+            this.montoPendiente = propiedad.getAlquiler();
         }
     }
     
@@ -232,10 +217,26 @@ public class Banco {
         
         return true;
     }
+
+    
+    public void ejecutarCobroPendiente(String rfid) {
+        if (this.deudorPendiente != null && this.deudorPendiente.getIdentificador().equals(rfid)) {
+            procesarPago(this.deudorPendiente, this.acreedorPendiente, this.montoPendiente, "PAGO_ALQUILER");
+            // Limpiar la memoria de deudas
+            this.deudorPendiente = null;
+            this.acreedorPendiente = null;
+            this.montoPendiente = 0.0;
+            System.out.println("Banco: Pago completado físicamente. Puedes TERMINAR_TURNO.");
+        } else {
+            System.err.println("Banco rechaza acción: La tarjeta no corresponde al jugador que debe pagar.");
+        }
+    }
+    
     /**
      * Finaliza el turno del jugador actual, reinicia su bandera de lanzamiento, 
      * rota la cola circular y vigila si se alcanzó el límite de la partida.
      */
+    
     public void finalizarTurnoActual() {
         Jugador jugadorSaliente = turnos.obtenerTurnoActual();
         if (jugadorSaliente != null) {
@@ -313,56 +314,50 @@ public class Banco {
     public void procesarLanzamientoDados(String idSolicitante) {
         Jugador jugadorActual = turnos.obtenerTurnoActual();
         
-        // 1. Validar que el jugador tenga el turno vigente
         if (jugadorActual == null || !jugadorActual.getIdentificador().equals(idSolicitante)) {
             System.err.println("Banco rechaza acción: No es el turno de " + idSolicitante);
             return;
         }
 
-        // 1.1 Validar que no haya tirado dados previamente en este mismo turno
         if (jugadorActual.haLanzadoDadosEnTurno()) {
             System.err.println("Banco rechaza acción: " + jugadorActual.getNombre() + " ya lanzó los dados en este turno.");
             return;
         }
         
-        // 1.2 Validar si el jugador está cumpliendo un castigo
         if (jugadorActual.getTurnosCastigo() > 0) {
             System.err.println("Banco rechaza acción: " + jugadorActual.getNombre() + " está castigado. Debe ceder el turno.");
             jugadorActual.setTurnosCastigo(jugadorActual.getTurnosCastigo() - 1);
-            jugadorActual.setHaLanzadoDadosEnTurno(true); // Se marca como consumido su intento
+            jugadorActual.setHaLanzadoDadosEnTurno(true); 
             return; 
         }
 
-        // Marcar la bandera de lanzamiento como consumida para el turno actual
         jugadorActual.setHaLanzadoDadosEnTurno(true);
 
-        // 2. Simular el resultado de dos dados electrónicos (2 al 12)
+        // El Banco calcula la matemática de los dados
         int resultadoDados = (int)(Math.random() * 11) + 2; 
         System.out.println("Banco: " + jugadorActual.getNombre() + " ha sacado un " + resultadoDados);
+        
+        // EL BANCO ORDENA DIRECTAMENTE AL ESP32 QUE ENCIENDA LA PANTALLA
+        if (this.cajeroFisico != null) {
+            this.cajeroFisico.encenderDisplay(resultadoDados);
+        }
 
-        // 3. Desplazar al jugador a través de los nodos de la lista circular
         Nodo<Casilla> posicion = jugadorActual.getPosicionActual();
         
         for (int i = 0; i < resultadoDados; i++) {
             posicion = posicion.getSiguiente();
-            
-            // Regla de inicio: Si al caminar pasa por el Inicio, cobra el premio
             if (posicion == tablero.getCasillaInicio()) {
                 System.out.println("Banco: " + jugadorActual.getNombre() + " ha pasado por el Inicio. ¡Cobra bono!");
                 procesarPago(null, jugadorActual, 200, "PREMIO_POR_INICIO");
             }
         }
         
-        // Actualizar la posición oficial del jugador en el servidor
         jugadorActual.setPosicionActual(posicion);
         Casilla casillaDestino = posicion.getValor();
         
         System.out.println("Banco: Nueva posición de " + jugadorActual.getNombre() + " -> " + casillaDestino.getNombre());
-
-        // Ejecutar la acción base de la casilla
         casillaDestino.ejecutarAccion(jugadorActual);
         
-        // 5. Delegación transaccional al Banco
         if (casillaDestino instanceof Propiedad) {
             evaluarPropiedad(jugadorActual, (Propiedad) casillaDestino);
         } else if (casillaDestino instanceof CasillaEvento) {
