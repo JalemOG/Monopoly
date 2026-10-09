@@ -8,42 +8,41 @@ public class Servidor {
 
     private int puerto;
     private ServerSocket socketServidor;
-    private Socket[] conexionesClientes;
-    private int jugadoresConectados;
-    private Banco banco;
     
-    private int limiteJugadores; 
+    // Este arreglo DEBE ser de tipo Socket, no otra cosa.
+    private Socket[] conexionesClientes; 
+    
+    private int jugadoresConectados;
+    private int limiteJugadores;
+    
+    // El Banco es el cerebro central (y el único dueño del ESP32)
+    private Banco banco;
 
-    /**
-     * @param puerto El puerto de conexión.
-     * @param limiteJugadores Cantidad de jugadores esperados (Ej. 2, 3 o 4).
-     */
     public Servidor(int puerto, int limiteJugadores) {
         this.puerto = puerto;
-        
-        // Validación de seguridad para respetar el máximo del proyecto
         if(limiteJugadores < 2 || limiteJugadores > 4) {
             throw new IllegalArgumentException("La partida debe ser de 2 a 4 jugadores.");
         }
-        
         this.limiteJugadores = limiteJugadores;
-        // El arreglo sigue siendo de tamaño máximo 4, aunque sobren espacios si juegan 2.
+        
         this.conexionesClientes = new Socket[4]; 
         this.jugadoresConectados = 0;
         
-        this.banco = new Banco();
+        // 1. Inicializamos el cerebro centralizado.
+        // Al hacer esto, el Banco automáticamente encenderá su propio cajeroFisico interno.
+        this.banco = new Banco(); 
     }
 
     public void iniciar() {
         try {
             socketServidor = new ServerSocket(this.puerto);
             System.out.println("Servidor iniciado en el puerto " + this.puerto);
-            System.out.println("Sala configurada para: " + this.limiteJugadores + " jugadores.");
-
+            
+            // Ya no hay hardware aquí. Solo escuchamos clientes.
             escucharClientes();
 
         } catch (IOException e) {
-            System.err.println("Error crítico al abrir el puerto: " + e.getMessage());
+            System.err.println("Error crítico al intentar abrir el puerto: " + e.getMessage());
         }
     }
 
@@ -81,5 +80,7 @@ public class Servidor {
         }
     }
     
-    public Banco getBanco(){return this.banco;}
+    public Banco getBanco(){
+        return this.banco;
+    }
 }
