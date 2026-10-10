@@ -75,25 +75,26 @@ public class ConexionSerial {
      * @param mensaje 
      */
     private void traducirComando(String mensaje) {
-        models.Jugador enTurno = bancoPadre.getJugadorEnTurno();
-        if (enTurno == null) return;
-
         if (mensaje.equals("ACCION:BOTON")) {
-            // El Cajero le avisa al Banco que el jugador actual tocó el botón
-            bancoPadre.procesarLanzamientoDados(enTurno.getIdentificador());
-
-        } else if (mensaje.startsWith("ACCION:RFID:")) {
-            String uid = mensaje.substring(12);
-
-            // Validamos que el dueño de la tarjeta que la está pasando sea el jugador en turno
-            if (enTurno.getIdentificador().equals(uid)) {
-                System.out.println("Cajero Físico: Tarjeta APROBADA para " + enTurno.getNombre());
-
-                // Le ordenamos al Banco que debite el dinero pendiente (Ej. Un alquiler)
-                bancoPadre.ejecutarCobroPendiente(uid);
-            } else {
-                System.err.println("Cajero Físico: Tarjeta RECHAZADA. UID no coincide con el turno actual.");
+            models.Jugador enTurno = bancoPadre.getJugadorEnTurno();
+            if (enTurno != null) {
+                System.out.println("Cajero: Botón presionado. Ejecutando jugada para: " + enTurno.getNombre());
+                
+                // 1. Pedimos al Banco que mueva al jugador y nos devuelva los dados
+                int dados = bancoPadre.procesarLanzamientoDados(enTurno.getIdentificador());
+                
+                if (dados > 0) {
+                    // 2. Encendemos los LEDs de la protoboard
+                    encenderDisplay(dados);
+                }
             }
+        } else if (mensaje.startsWith("ACCION:RFID:")) {
+            // Extraemos el código de la tarjeta (UID)
+            String uidEscaneado = mensaje.substring(12);
+            System.out.println("Cajero Físico: Tarjeta detectada -> " + uidEscaneado);
+            
+            // Le pedimos al Banco que intente ejecutar el pago pendiente con esa tarjeta
+            bancoPadre.ejecutarCobroPendiente(uidEscaneado);
         }
     }
 

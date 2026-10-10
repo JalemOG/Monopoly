@@ -5,11 +5,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
-import models.Jugador;
 
 /**
  * Hilo independiente encargado de gestionar la comunicación de entrada y salida
- * con un cliente específico. Esto permite que el servidor escuche a los 4 jugadores
+ * con un cliente específico. Esto permite que el servidor escuche a los jugadores
  * simultáneamente sin bloquearse.
  */
 public class ManejadorCliente extends Thread {
@@ -18,41 +17,29 @@ public class ManejadorCliente extends Thread {
     private Servidor servidorPadre;
     
     // Tuberías de comunicación
-    private BufferedReader entrada; // Para escuchar al cliente
-    private PrintWriter salida;     // Para responderle al cliente
+    private BufferedReader entrada; 
+    private PrintWriter salida;     
     
     // Datos del jugador conectado a este hilo
     private String idRfid;
     private String nombreJugador;
 
-    /**
-     * Constructor del Hilo.
-     * @param socket El enchufe de red específico de este jugador.
-     * @param servidorPadre Referencia al servidor principal para poder hacer Broadcast.
-     */
     public ManejadorCliente(Socket socket, Servidor servidorPadre) {
         this.socket = socket;
         this.servidorPadre = servidorPadre;
     }
 
-    /**
-     * Método principal del Hilo. Se ejecuta automáticamente al llamar a .start().
-     * Contiene el ciclo infinito que escucha los comandos del protocolo de texto.
-     */
     @Override
     public void run() {
         try {
-            // Inicializar las tuberías de entrada y salida
             entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             salida = new PrintWriter(socket.getOutputStream(), true);
 
             String mensajeCliente;
 
-            // CICLO INFINITO DE ESCUCHA (Solo afecta a este hilo, no al Servidor principal)
+            // CICLO INFINITO DE ESCUCHA
             while ((mensajeCliente = entrada.readLine()) != null) {
                 System.out.println("[Recibido de " + nombreJugador + "]: " + mensajeCliente);
-                
-                // Enviar el mensaje al analizador del protocolo
                 procesarComando(mensajeCliente);
             }
 
@@ -70,7 +57,7 @@ public class ManejadorCliente extends Thread {
         String[] partes = mensaje.split(" ");
         String comando = partes[0].toUpperCase();
 
-        // Extraemos al jugador en turno para validar los candados de seguridad
+        // Extraemos al jugador en turno para validar los candados de seguridad en cada acción
         models.Jugador enTurno = servidorPadre.getBanco().getJugadorEnTurno();
 
         switch (comando) {
@@ -79,9 +66,20 @@ public class ManejadorCliente extends Thread {
                     this.nombreJugador = partes[1];
                     this.idRfid = partes[2];
                     
-                    // Delega al Banco la inscripción oficial
+                    // ACCIÓN REAL: Inscribir al jugador en la Cola Circular del Banco
                     servidorPadre.getBanco().registrarJugador(nombreJugador, idRfid);
                     enviarMensaje("BIENVENIDO " + nombreJugador);
+                }
+                break;
+
+            case "TIRAR_DADOS":
+                // Validación estricta: impedir jugar fuera de turno
+                if (enTurno != null && enTurno.getIdentificador().equals(this.idRfid)) {
+                    System.out.println("-> " + nombreJugador + " lanza los dados.");
+                    // ACCIÓN REAL: El banco mueve al jugador y dispara el polimorfismo
+                    servidorPadre.getBanco().procesarLanzamientoDados(this.idRfid);
+                } else {
+                    enviarMensaje("ERROR No es tu turno para lanzar los dados.");
                 }
                 break;
 
@@ -92,16 +90,18 @@ public class ManejadorCliente extends Thread {
                     if (casillaActual instanceof models.Propiedad) {
                         models.Propiedad propiedad = (models.Propiedad) casillaActual;
                         
-                        // Valida fondos y ejecuta el pago (El Banco Central es el destino, por ende es null)
+                        // Validar fondos e impedir comprar sin saldo suficiente
                         if (servidorPadre.getBanco().procesarPago(enTurno, null, propiedad.getPrecioCompra(), "COMPRA_PROPIEDAD")) {
                             propiedad.comprar(enTurno);
                             enTurno.getPropiedadesAdquiridas().agregar(propiedad);
                             System.out.println("-> " + nombreJugador + " ha comprado " + propiedad.getNombre());
+                            // Notificamos a la sala
+                            servidorPadre.transmitirEstadoTodos(nombreJugador + " ha comprado " + propiedad.getNombre());
                         } else {
                             enviarMensaje("ERROR Saldo insuficiente para realizar la compra.");
                         }
                     } else {
-                        enviarMensaje("ERROR La casilla actual no es comprable.");
+                        enviarMensaje("ERROR La casilla actual no es una propiedad comprable.");
                     }
                 } else {
                     enviarMensaje("ERROR No es tu turno para comprar.");
@@ -110,32 +110,42 @@ public class ManejadorCliente extends Thread {
 
             case "NO_COMPRAR":
                 if (enTurno != null && enTurno.getIdentificador().equals(this.idRfid)) {
-                    System.out.println("-> " + nombreJugador + " rechazó la compra. Turno libre para finalizar.");
+                    System.out.println("-> " + nombreJugador + " decidió rechazar la compra.");
                     enviarMensaje("Compra rechazada. Puedes TERMINAR_TURNO.");
                 } else {
                     enviarMensaje("ERROR No es tu turno.");
                 }
                 break;
 
+   
             case "TERMINAR_TURNO":
                 if (enTurno != null && enTurno.getIdentificador().equals(this.idRfid)) {
                     System.out.println("-> " + nombreJugador + " ha finalizado su turno.");
+                    
+                    // El Banco avanza la Cola Circular internamente
                     servidorPadre.getBanco().finalizarTurnoActual();
                     
-                    // Extrae al nuevo jugador y hace Broadcast a toda la sala
+                    // Extraemos al nuevo jugador en turno
                     models.Jugador nuevoJugador = servidorPadre.getBanco().getJugadorEnTurno();
+                    
+                    // Hacemos Broadcast a toda la sala de quién es el nuevo turno
                     if (nuevoJugador != null) {
                         servidorPadre.transmitirEstadoTodos("NUEVO_TURNO " + nuevoJugador.getIdentificador());
                     }
                 } else {
-                    enviarMensaje("ERROR No es tu turno para finalizar.");
+                    enviarMensaje("ERROR No puedes terminar el turno porque no es tu turno.");
                 }
                 break;
 
+     
             case "CONSULTAR_TRANSACCIONES":
-                // Ejecuta la búsqueda en el historial doblemente enlazado
-                String reporte = servidorPadre.getBanco().consultarTransaccionesPorJugador(this.nombreJugador);
-                enviarMensaje(reporte);
+                System.out.println("-> " + nombreJugador + " ha solicitado exportar el historial.");
+                
+                // El servidor le pide al Banco que genere el archivo .TXT físico
+                servidorPadre.getBanco().exportarHistorialTXT();
+                
+                // Le confirmamos EXCLUSIVAMENTE al cliente que lo solicitó (no un broadcast)
+                enviarMensaje("HISTORIAL_EXPORTADO");
                 break;
 
             default:
@@ -146,7 +156,6 @@ public class ManejadorCliente extends Thread {
 
     /**
      * Envía un mensaje de texto desde el Servidor hacia este cliente en específico.
-     * @param mensaje El comando o respuesta a enviar.
      */
     public void enviarMensaje(String mensaje) {
         if (salida != null) {
@@ -167,7 +176,6 @@ public class ManejadorCliente extends Thread {
         }
     }
     
-    // --- Getters ---
     public String getIdRfid() { return idRfid; }
     public String getNombreJugador() { return nombreJugador; }
 }
