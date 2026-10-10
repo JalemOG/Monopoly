@@ -1,0 +1,3 @@
+=== REPORTE OFICIAL DE TRANSACCIONES - MONOPOLY ===
+[TXN-1791597765614] Turno: 1 | Tipo: COMPRA_PROPIEDAD | Origen: Productora_A -> Destino: BANCO CENTRAL | Monto: $160,00 | Desc: Transferencia aprobada
+[TXN-1791597800913] Turno: 2 | Tipo: COMPRA_PROPIEDAD | Origen: Productora_B -> Destino: BANCO CENTRAL | Monto: $100,00 | Desc: Transferencia aprobada

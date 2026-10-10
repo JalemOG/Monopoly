@@ -36,6 +36,37 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
             </plugin>
+            <plugin>
+                <groupId>de.elnarion.maven</groupId>
+                <artifactId>plantuml-generator-maven-plugin</artifactId>
+                <version>3.0.1</version>
+                <executions>
+                    <execution>
+                        <id>generate-uml</id>
+                        <!-- ASEGURAMOS QUE SE EJECUTE EN ESTA FASE -->
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <outputFilename>diagrama.puml</outputFilename>
+                            <!-- DEFINIMOS LA RUTA CORRECTA PARA TUS CLASES COMPILADAS -->
+                            <scanPackages>
+                                <scanPackage>main</scanPackage>
+                                <scanPackage>models</scanPackage>
+                                <scanPackage>network</scanPackage>
+                                <scanPackage>rfid</scanPackage>
+                                <scanPackage>structures</scanPackage>
+                                <scanPackage>ui</scanPackage>
+                            </scanPackages>
+                            <!-- OCULTAMOS CIERTOS ELEMENTOS PRIVADOS SI LO DESEAS (Opcional, pero recomendado) -->
+                            <hideClasses>
+                                <hideClass>java.*</hideClass>
+                            </hideClasses>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

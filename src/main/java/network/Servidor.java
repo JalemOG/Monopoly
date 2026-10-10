@@ -9,13 +9,11 @@ public class Servidor {
     private int puerto;
     private ServerSocket socketServidor;
     
-    // Este arreglo DEBE ser de tipo Socket, no otra cosa.
-    private Socket[] conexionesClientes; 
-    
+    // CAMBIO CRÍTICO: Ahora guardamos los Manejadores para poder usar su método enviarMensaje()
+    private ManejadorCliente[] manejadoresClientes; 
     private int jugadoresConectados;
     private int limiteJugadores;
     
-    // El Banco es el cerebro central (y el único dueño del ESP32)
     private Banco banco;
 
     public Servidor(int puerto, int limiteJugadores) {
@@ -25,12 +23,12 @@ public class Servidor {
         }
         this.limiteJugadores = limiteJugadores;
         
-        this.conexionesClientes = new Socket[4]; 
+        // Inicializamos el arreglo de manejadores
+        this.manejadoresClientes = new ManejadorCliente[4]; 
         this.jugadoresConectados = 0;
         
-        // 1. Inicializamos el cerebro centralizado.
-        // Al hacer esto, el Banco automáticamente encenderá su propio cajeroFisico interno.
-        this.banco = new Banco(); 
+        // Inicializamos el cerebro centralizado
+        this.banco = new Banco(this); 
     }
 
     public void iniciar() {
@@ -38,7 +36,6 @@ public class Servidor {
             socketServidor = new ServerSocket(this.puerto);
             System.out.println("Servidor iniciado en el puerto " + this.puerto);
             
-            // Ya no hay hardware aquí. Solo escuchamos clientes.
             escucharClientes();
 
         } catch (IOException e) {
@@ -48,17 +45,18 @@ public class Servidor {
 
     private void escucharClientes() {
         try {
-            // El ciclo se rompe al alcanzar el límite dinámico
             while (jugadoresConectados < limiteJugadores) {
                 
                 System.out.println("Esperando jugador " + (jugadoresConectados + 1) + " de " + limiteJugadores + "...");
                 
-                Socket socketCliente = socketServidor.accept(); // Se pausa aquí
-                
-                conexionesClientes[jugadoresConectados] = socketCliente;
+                Socket socketCliente = socketServidor.accept(); 
                 
                 ManejadorCliente manejador = new ManejadorCliente(socketCliente, this);
-                manejador.start(); // Esto inicia el método run() en paralelo
+                
+                // Guardamos el manejador en la lista oficial del Servidor
+                manejadoresClientes[jugadoresConectados] = manejador;
+                
+                manejador.start(); 
                 
                 jugadoresConectados++;
                 
@@ -73,10 +71,17 @@ public class Servidor {
         }
     }
 
+    /**
+     * Transmite un mensaje REAL a todos los clientes conectados a través de la red TCP.
+     */
     public void transmitirEstadoTodos(String mensaje) {
-        // Al transmitir, solo recorremos hasta 'jugadoresConectados', no el arreglo completo de 4.
+        System.out.println("[BROADCAST ENVIADO A LA RED] -> " + mensaje);
+        
+        // Recorremos los manejadores activos y les ordenamos enviar el texto por el Socket
         for (int i = 0; i < jugadoresConectados; i++) {
-            System.out.println("[BROADCAST a Jugador " + (i+1) + "] -> " + mensaje);
+            if (manejadoresClientes[i] != null) {
+                manejadoresClientes[i].enviarMensaje(mensaje); // ¡Aquí ocurre la magia de red!
+            }
         }
     }
     
