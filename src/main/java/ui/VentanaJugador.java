@@ -21,6 +21,9 @@ public class VentanaJugador extends JFrame {
     private JLabel lblNombreJugador;
     private JButton btnComprar;
     private JButton btnNoComprar;
+    private JLabel lblResultadoDados;
+    private JLabel lblCasillaActual;
+    private JLabel lblDetallePropiedad;
 
     public VentanaJugador(String nombreJugador) {
         super("Monopoly: Industria Musical - " + nombreJugador);
@@ -55,17 +58,35 @@ public class VentanaJugador extends JFrame {
         JPanel panelDerecho = new JPanel(new BorderLayout(5, 5));
         
         // --- 3.1. PANEL SUPERIOR: Info del Jugador ---
-        JPanel panelInfo = new JPanel(new GridLayout(2, 1, 0, 5));
+        JPanel panelInfo = new JPanel(new GridLayout(5, 1, 0, 4));
+        panelInfo.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createTitledBorder("Estado del Jugador y Casilla"),
+                BorderFactory.createEmptyBorder(5, 8, 5, 8)
+        ));
         
         lblNombreJugador = new JLabel("Productora: " + nombre);
-        lblNombreJugador.setFont(new Font("Arial", Font.BOLD, 18));
+        lblNombreJugador.setFont(new Font("Arial", Font.BOLD, 16));
         
-        lblSaldo = new JLabel("Saldo actual: Calculando...");
-        lblSaldo.setFont(new Font("Arial", Font.BOLD, 16));
-        lblSaldo.setForeground(new Color(34, 139, 34)); // Verde
+        lblSaldo = new JLabel("Saldo actual: $1500.0");
+        lblSaldo.setFont(new Font("Arial", Font.BOLD, 15));
+        lblSaldo.setForeground(new Color(34, 139, 34));
+        
+        lblResultadoDados = new JLabel("🎲 Última tirada: -");
+        lblResultadoDados.setFont(new Font("Arial", Font.BOLD, 14));
+        lblResultadoDados.setForeground(new Color(218, 165, 32));
+
+        lblCasillaActual = new JLabel("📍 Casilla actual: Inicio");
+        lblCasillaActual.setFont(new Font("Arial", Font.BOLD, 14));
+        lblCasillaActual.setForeground(new Color(47, 79, 79));
+
+        lblDetallePropiedad = new JLabel("ℹ️ Detalles: Esperando lanzamiento...");
+        lblDetallePropiedad.setFont(new Font("Arial", Font.PLAIN, 13));
         
         panelInfo.add(lblNombreJugador);
         panelInfo.add(lblSaldo);
+        panelInfo.add(lblResultadoDados);
+        panelInfo.add(lblCasillaActual);
+        panelInfo.add(lblDetallePropiedad);
         
         panelDerecho.add(panelInfo, BorderLayout.NORTH);
 
@@ -176,8 +197,9 @@ public class VentanaJugador extends JFrame {
      * Habilita los botones de compra forzando el repintado en el hilo de Swing.
      * Esto soluciona el problema de que los botones se queden visualmente en gris.
      */
-    public void habilitarBotonesCompra() {
+    public void habilitarBotonesCompra(String precio) {
         SwingUtilities.invokeLater(() -> {
+            btnComprar.setText("Comprar ($" + precio + ")");
             btnComprar.setEnabled(true);
             btnNoComprar.setEnabled(true);
             btnComprar.repaint();
@@ -188,13 +210,13 @@ public class VentanaJugador extends JFrame {
     /**
      * Deshabilita los botones de compra después de tomar una decisión.
      */
-    private void bloquearBotones() {
+    public void bloquearBotones() {
         SwingUtilities.invokeLater(() -> {
+            btnComprar.setText("Comprar Propiedad");
             btnComprar.setEnabled(false);
             btnNoComprar.setEnabled(false);
         });
     }
-
     /**
      * Mueve la representación gráfica de la ficha del jugador en el tablero.
      */
@@ -213,6 +235,23 @@ public class VentanaJugador extends JFrame {
         SwingUtilities.invokeLater(() -> {
             DialogoCartaEvento dialogo = new DialogoCartaEvento(this, descripcion, tipoEfecto, valor);
             dialogo.setVisible(true);
+        });
+    }
+    
+    /**
+     * Muestra el resultado de los dados en la etiqueta superior y en el historial.
+     */
+    public void mostrarResultadoDados(String idJugador, String valorDados) {
+        SwingUtilities.invokeLater(() -> {
+            lblResultadoDados.setText("🎲 Última tirada (" + idJugador + "): [ " + valorDados + " ]");
+            agregarMensaje("🎲 El jugador [" + idJugador + "] lanzó los dados y obtuvo un: [" + valorDados + "]");
+        });
+    }
+    
+    public void actualizarInfoCasilla(String textoCasilla, String textoDetalle) {
+        SwingUtilities.invokeLater(() -> {
+            lblCasillaActual.setText("📍 " + textoCasilla);
+            lblDetallePropiedad.setText("ℹ️ " + textoDetalle);
         });
     }
 }

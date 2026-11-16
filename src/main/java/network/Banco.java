@@ -12,6 +12,7 @@ import models.CasillaEvento;
 import models.Propiedad;
 import rfid.ConexionSerial; // Importación obligatoria del hardware
 
+
 /**
  * Entidad centralizadora que administra la lógica oficial de la partida.
  */
@@ -26,6 +27,7 @@ public class Banco {
     private Jugador deudorPendiente;
     private Jugador acreedorPendiente;
     private double montoPendiente;
+    private Propiedad propiedadEnVenta;
 
     // EL BANCO CONOCE AL SERVIDOR PADRE PARA TRANSMITIR COMANDOS A LA RED
     private Servidor servidorPadre;
@@ -127,21 +129,40 @@ public class Banco {
     }
     
     public void evaluarPropiedad(Jugador jugador, Propiedad propiedad) {
+        String nombrePropLimpio = propiedad.getNombre().replace(" ", "_");
+
         if (propiedad.getPropietario() == null) {
-            System.out.println("Banco: " + propiedad.getNombre() + " está libre. Esperando comando COMPRAR_PROPIEDAD o NO_COMPRAR de " + jugador.getNombre());
+            this.propiedadEnVenta = propiedad;
+            System.out.println("Banco: " + propiedad.getNombre() + " está libre. Esperando decisión de " + jugador.getNombre());
             
             if (this.servidorPadre != null) {
-                this.servidorPadre.transmitirEstadoTodos("ESPERANDO_ACCION " + jugador.getIdentificador() + " " + propiedad.getIdentificador());
+                // Formato: ESPERANDO_ACCION <RFID_JUGADOR> <ID_PROP> <NOMBRE_PROP> <PRECIO> <ALQUILER>
+                this.servidorPadre.transmitirEstadoTodos(
+                    "ESPERANDO_ACCION " + jugador.getIdentificador() + " " + 
+                    propiedad.getIdentificador() + " " + nombrePropLimpio + " " + 
+                    propiedad.getPrecioCompra() + " " + propiedad.getAlquiler()
+                );
             }
-
         } else if (!propiedad.getPropietario().getIdentificador().equals(jugador.getIdentificador())) {
-            System.out.println("Banco: Alerta de cobro. ¡Acerca tu tarjeta RFID al Cajero para pagar $" + propiedad.getAlquiler() + "!");
+            this.propiedadEnVenta = null;
             this.deudorPendiente = jugador;
             this.acreedorPendiente = propiedad.getPropietario();
             this.montoPendiente = propiedad.getAlquiler();
+
+            String nombreDuenoLimpio = propiedad.getPropietario().getNombre().replace(" ", "_");
+            System.out.println("Banco: Alerta de cobro. ¡Acerca tu tarjeta RFID al Cajero para pagar $" + propiedad.getAlquiler() + "!");
             
             if (this.servidorPadre != null) {
-                this.servidorPadre.transmitirEstadoTodos("PAGO_OBLIGATORIO " + propiedad.getPropietario().getIdentificador() + " " + propiedad.getAlquiler());
+                // Formato: PAGO_OBLIGATORIO <RFID_DEUDOR> <ALQUILER> <NOMBRE_PROP> <NOMBRE_DUENO>
+                this.servidorPadre.transmitirEstadoTodos(
+                    "PAGO_OBLIGATORIO " + jugador.getIdentificador() + " " + 
+                    propiedad.getAlquiler() + " " + nombrePropLimpio + " " + nombreDuenoLimpio
+                );
+            }
+        } else {
+            this.propiedadEnVenta = null;
+            if (this.servidorPadre != null) {
+                this.servidorPadre.transmitirEstadoTodos(jugador.getNombre() + " visitó su propia propiedad: " + propiedad.getNombre());
             }
         }
     }
@@ -210,15 +231,38 @@ public class Banco {
     }
 
     public void ejecutarCobroPendiente(String rfid) {
-        if (this.deudorPendiente != null && this.deudorPendiente.getIdentificador().equals(rfid)) {
-            procesarPago(this.deudorPendiente, this.acreedorPendiente, this.montoPendiente, "PAGO_ALQUILER");
-            this.deudorPendiente = null;
-            this.acreedorPendiente = null;
-            this.montoPendiente = 0.0;
-            System.out.println("Banco: Pago completado físicamente. Puedes TERMINAR_TURNO.");
-        } else {
-            System.err.println("Banco rechaza acción: La tarjeta no corresponde al jugador que debe pagar.");
+        Jugador jugadorActual = turnos.obtenerTurnoActual();
+
+        // CASO 1: Hay un cobro de alquiler pendiente
+        if (this.deudorPendiente != null) {
+            if (this.deudorPendiente.getIdentificador().equalsIgnoreCase(rfid)) {
+                procesarPago(this.deudorPendiente, this.acreedorPendiente, this.montoPendiente, "PAGO_ALQUILER");
+                this.deudorPendiente = null;
+                this.acreedorPendiente = null;
+                this.montoPendiente = 0.0;
+                System.out.println("Banco: Pago de alquiler completado con tarjeta RFID. Puedes TERMINAR_TURNO.");
+            } else {
+                System.err.println("Banco rechaza acción: La tarjeta (" + rfid + ") no corresponde al deudor (" + this.deudorPendiente.getIdentificador() + ").");
+            }
+            return;
         }
+
+        // CASO 2: El jugador en turno está comprando una propiedad disponible con su tarjeta RFID
+        if (this.propiedadEnVenta != null && jugadorActual != null) {
+            if (jugadorActual.getIdentificador().equalsIgnoreCase(rfid)) {
+                if (procesarPago(jugadorActual, null, this.propiedadEnVenta.getPrecioCompra(), "COMPRA_PROPIEDAD")) {
+                    this.propiedadEnVenta.comprar(jugadorActual);
+                    jugadorActual.getPropiedadesAdquiridas().agregar(this.propiedadEnVenta);
+                    System.out.println("Banco: " + jugadorActual.getNombre() + " ha comprado " + this.propiedadEnVenta.getNombre() + " usando su tarjeta RFID.");
+                    this.propiedadEnVenta = null;
+                }
+            } else {
+                System.err.println("Banco rechaza acción: La tarjeta (" + rfid + ") no pertenece al jugador en turno (" + jugadorActual.getIdentificador() + ").");
+            }
+            return;
+        }
+
+        System.err.println("Banco rechaza acción: No hay ningún cobro ni compra pendiente en este momento.");
     }
     
     public void finalizarTurnoActual() {
@@ -308,6 +352,13 @@ public class Banco {
         // El Banco calcula la matemática de los dados
         int resultadoDados = (int)(Math.random() * 11) + 2; 
         System.out.println("Banco: " + jugadorActual.getNombre() + " ha sacado un " + resultadoDados);
+        
+        if (this.servidorPadre != null) {
+            this.servidorPadre.transmitirEstadoTodos("RESULTADO_DADOS " + jugadorActual.getNombre() + " " + resultadoDados);
+        }
+        if (this.cajeroFisico != null) {
+            this.cajeroFisico.encenderDisplay(resultadoDados);
+        }
 
         // Movemos al jugador a través de los nodos
         Nodo<Casilla> posicion = jugadorActual.getPosicionActual();
@@ -327,7 +378,12 @@ public class Banco {
         
         // --- NOTIFICAR LA NUEVA POSICIÓN A LA UI DE LA RED ---
         if (this.servidorPadre != null) {
-            this.servidorPadre.transmitirEstadoTodos("NUEVA_POSICION " + jugadorActual.getIdentificador() + " " + casillaDestino.getPosicion());
+            String nombreCasillaLimpio = casillaDestino.getNombre().replace(" ", "_");
+            // Formato: NUEVA_POSICION <ID_RFID> <POSICION> <NOMBRE_JUGADOR> <NOMBRE_CASILLA>
+            this.servidorPadre.transmitirEstadoTodos(
+                "NUEVA_POSICION " + jugadorActual.getIdentificador() + " " + 
+                casillaDestino.getPosicion() + " " + jugadorActual.getNombre() + " " + nombreCasillaLimpio
+            );
         }
 
         // Ejecutar las reglas de la nueva casilla

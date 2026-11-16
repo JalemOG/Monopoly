@@ -36,6 +36,9 @@ public class ConexionSerial {
         if (puertoSerial == null) puertoSerial = puertosDisponibles[0];
 
         puertoSerial.setBaudRate(115200); 
+        
+        // Permite escribir y escuchar al mismo tiempo sin bloquear el cable USB
+        puertoSerial.setComPortTimeouts(SerialPort.TIMEOUT_NONBLOCKING, 0, 0);
 
         if (puertoSerial.openPort()) {
             System.out.println("Hardware: ESP32 conectado exitosamente como CAJERO CENTRAL en " + puertoSerial.getSystemPortName());
@@ -79,29 +82,24 @@ public class ConexionSerial {
             models.Jugador enTurno = bancoPadre.getJugadorEnTurno();
             if (enTurno != null) {
                 System.out.println("Cajero: Botón presionado. Ejecutando jugada para: " + enTurno.getNombre());
-                
-                // 1. Pedimos al Banco que mueva al jugador y nos devuelva los dados
-                int dados = bancoPadre.procesarLanzamientoDados(enTurno.getIdentificador());
-                
-                if (dados > 0) {
-                    // 2. Encendemos los LEDs de la protoboard
-                    encenderDisplay(dados);
-                }
+                bancoPadre.procesarLanzamientoDados(enTurno.getIdentificador());
             }
         } else if (mensaje.startsWith("ACCION:RFID:")) {
-            // Extraemos el código de la tarjeta (UID)
-            String uidEscaneado = mensaje.substring(12);
+            String uidEscaneado = mensaje.substring(12).trim();
             System.out.println("Cajero Físico: Tarjeta detectada -> " + uidEscaneado);
-            
-            // Le pedimos al Banco que intente ejecutar el pago pendiente con esa tarjeta
             bancoPadre.ejecutarCobroPendiente(uidEscaneado);
         }
     }
 
-    public void encenderDisplay(int valorDados) {
-        if (salidaHardware != null && puertoSerial.isOpen()) {
-            salidaHardware.print("DADOS:" + valorDados + "\n");
-            salidaHardware.flush();
+    public void encenderDisplay(int valor) {
+        if (puertoSerial != null && puertoSerial.isOpen()) {
+            String comando = "DADOS:" + valor + "\n";
+            byte[] datos = comando.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            int escritos = puertoSerial.writeBytes(datos, datos.length);
+            puertoSerial.flushIOBuffers(); // Fuerza la salida física por el cable USB
+            System.out.println("[Cajero Físico] Enviando a display: " + comando.trim() + " (" + escritos + " bytes)");
+        } else {
+            System.err.println("[Cajero Físico] ERROR: No se pudo enviar al display porque el puerto está cerrado.");
         }
     }
     

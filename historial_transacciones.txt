@@ -1,3 +1,8 @@
 === REPORTE OFICIAL DE TRANSACCIONES - MONOPOLY ===
-[TXN-1791597765614] Turno: 1 | Tipo: COMPRA_PROPIEDAD | Origen: Productora_A -> Destino: BANCO CENTRAL | Monto: $160,00 | Desc: Transferencia aprobada
-[TXN-1791597800913] Turno: 2 | Tipo: COMPRA_PROPIEDAD | Origen: Productora_B -> Destino: BANCO CENTRAL | Monto: $100,00 | Desc: Transferencia aprobada
+[TXN-1793658388355] Turno: 1 | Tipo: CARTA_EVENTO | Origen: BANCO CENTRAL -> Destino: Productora_A | Monto: $200,00 | Desc: Inyección de capital
+[TXN-1793658448859] Turno: 3 | Tipo: COMPRA_PROPIEDAD | Origen: Productora_A -> Destino: BANCO CENTRAL | Monto: $320,00 | Desc: Transferencia aprobada
+[TXN-1793658460345] Turno: 4 | Tipo: PREMIO_POR_INICIO | Origen: BANCO CENTRAL -> Destino: Productora_B | Monto: $200,00 | Desc: Inyección de capital
+[TXN-1793658470253] Turno: 5 | Tipo: PREMIO_POR_INICIO | Origen: BANCO CENTRAL -> Destino: Productora_A | Monto: $200,00 | Desc: Inyección de capital
+[TXN-1793658473675] Turno: 5 | Tipo: COMPRA_PROPIEDAD | Origen: Productora_A -> Destino: BANCO CENTRAL | Monto: $120,00 | Desc: Transferencia aprobada
+[TXN-1793658478442] Turno: 6 | Tipo: CARTA_EVENTO | Origen: BANCO CENTRAL -> Destino: Productora_B | Monto: $100,00 | Desc: Inyección de capital
+[TXN-1793658511241] Turno: 8 | Tipo: COMPRA_PROPIEDAD | Origen: Productora_B -> Destino: BANCO CENTRAL | Monto: $180,00 | Desc: Transferencia aprobada
