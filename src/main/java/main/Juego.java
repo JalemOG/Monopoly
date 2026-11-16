@@ -33,7 +33,7 @@ public class Juego {
         System.out.println("\n--- Arrancando App Cliente 1 ---");
         VentanaJugador gui1 = new VentanaJugador("Productora_A");
         Cliente jugador1 = new Cliente("127.0.0.1", 8080, gui1);
-        jugador1.conectar("Productora_A", "RFID_A1B2");
+        jugador1.conectar("Productora_A", "D6E60B9E");
 
         // Pausa de 1 segundo para ver los mensajes en orden
         try {
@@ -45,6 +45,6 @@ public class Juego {
         System.out.println("\n--- Arrancando App Cliente 2 ---");
         VentanaJugador gui2 = new VentanaJugador("Productora_B");
         Cliente jugador2 = new Cliente("127.0.0.1", 8080, gui2);
-        jugador2.conectar("Productora_B", "RFID_C3D4");
+        jugador2.conectar("Productora_B", "B96CA829");
     }
 }

@@ -58,10 +58,10 @@ public class PanelTablero extends JPanel {
     private void dibujarCircuito(Graphics2D g2d, int ancho, int alto, int anchoC, int altoC) {
         // Nombres temáticos (abreviados para que quepan en el dibujo)
         String[] nombres = {
-            "1. INICIO", "2. Bar Local", "3. Club Comedia", "4. EVENTO", "5. Baja Beach", "6. Viña Mar",
-            "7. CÁRCEL", "8. Spotify", "9. Ultra Fest", "10. EDC", "11. EVENTO", "12. Tomorrowland",
-            "13. DESCANSO", "14. Apple M.", "15. Lollapalooza", "16. Rock Rio", "17. EVENTO", "18. Coachella",
-            "19. A CÁRCEL", "20. YouTube", "21. Madison S.", "22. EVENTO", "23. E. Azteca", "24. Wembley"
+            "1. INICIO", "2. Bar La Nave", "3. La California", "4. La Teja", "5. Hip Hop Nation", "6. Jogo Pinic",
+            "7. Cancelado en Redes", "8. Spotify", "9. Ocaso Festival", "10. Parade Limón", "11. MTV Music Awards", "12. Tomorrowland",
+            "13. Descanso VIP", "14. Apple Music", "15. Lollapalooza", "16. Rollin Loud", "17. Noticias de la Industria", "18. Coachella",
+            "19. Escándalo Público", "20. YouTube Music", "21. Madison S.", "22. Premios Grammy", "23. Estadio Azteca", "24. Wembley"
         };
 
         g2d.setColor(Color.WHITE);

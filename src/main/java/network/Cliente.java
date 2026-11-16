@@ -91,25 +91,63 @@ public class Cliente {
 
             case "RESULTADO_DADOS":
                 if (partes.length >= 3) {
-                    ventana.agregarMensaje("🎲 Los dados marcan un: [" + partes[2] + "]");
+                    String nombreTirador = partes[1];
+                    String valor = partes[2];
+                    ventana.mostrarResultadoDados(nombreTirador, valor);
                 }
                 break;
 
             case "PAGO_OBLIGATORIO":
-                ventana.agregarMensaje("\n¡ALERTA DE COBRO! Acerca tu tarjeta al Cajero físico para pagar $" + partes[2]);
+                // Formato: PAGO_OBLIGATORIO <RFID_DEUDOR> <ALQUILER> <NOMBRE_PROP> <NOMBRE_DUENO>
+                if (partes.length >= 5) {
+                    String rfidDeudor = partes[1];
+                    String alquiler = partes[2];
+                    String nombreProp = partes[3].replace("_", " ");
+                    String nombreDueno = partes[4].replace("_", " ");
+
+                    ventana.actualizarInfoCasilla(
+                        nombreProp,
+                        "Dueño: " + nombreDueno + "  |  Alquiler a pagar: $" + alquiler
+                    );
+
+                    ventana.agregarMensaje("\n⚠️ ¡PROPIEDAD PRIVADA! (" + nombreProp + " pertenece a " + nombreDueno + ")");
+                    if (this.idRfid.equals(rfidDeudor)) {
+                        ventana.agregarMensaje("💳 ¡Acerca tu tarjeta RFID al Cajero para pagar $" + alquiler + " de alquiler!");
+                    } else {
+                        ventana.agregarMensaje("⏳ Esperando pago de alquiler ($" + alquiler + ") con tarjeta RFID...");
+                    }
+                }
+                break;
+                
+            case "PAGO_COMPLETADO":
+                if (partes.length >= 4) {
+                    ventana.agregarMensaje("✅ " + partes[1] + " pagó $" + partes[3] + " de alquiler a " + partes[2] + " vía RFID.");
+                }
                 break;
 
             case "ESPERANDO_ACCION":
-                // Formato esperado: ESPERANDO_ACCION <RFID_JUGADOR> <ID_PROPIEDAD>
-                if (partes.length >= 3) { // Aseguramos que existan las 3 partes
+                // Formato: ESPERANDO_ACCION <RFID_JUGADOR> <ID_PROP> <NOMBRE_PROP> <PRECIO> <ALQUILER>
+                if (partes.length >= 6) {
                     String rfidEsperado = partes[1];
-                    String idPropiedad = partes[2]; // Opcional, por si lo necesitas en el futuro
+                    String idProp = partes[2];
+                    String nombreProp = partes[3].replace("_", " ");
+                    String precio = partes[4];
+                    String alquiler = partes[5];
                     
-                    ventana.agregarMensaje("\n🏢 ¡Propiedad Disponible! Revisa la info y decide.");
+                    ventana.actualizarInfoCasilla(
+                        nombreProp + " [" + idProp + "]",
+                        "Precio: $" + precio + "  |  Alquiler: $" + alquiler + "  |  Estado: Libre"
+                    );
                     
-                    // Solo si mi ID coincide con el que el Banco espera, habilito MIS botones
+                    ventana.agregarMensaje("\n┌──────────────────────────────────────────┐");
+                    ventana.agregarMensaje("│ 🏢 PROPIEDAD DISPONIBLE: " + nombreProp);
+                    ventana.agregarMensaje("│ 💵 Precio de compra: $" + precio);
+                    ventana.agregarMensaje("│ 🏷️ Alquiler futuro:  $" + alquiler);
+                    ventana.agregarMensaje("└──────────────────────────────────────────┘");
+                    
                     if (this.idRfid.equals(rfidEsperado)) {
-                        ventana.habilitarBotonesCompra(); 
+                        ventana.agregarMensaje("👉 Usa los botones o acerca tu tarjeta RFID para comprar.");
+                        ventana.habilitarBotonesCompra(precio); 
                     }
                 }
                 break;
@@ -121,11 +159,20 @@ public class Cliente {
                 }
                 break;
             
-            case "NUEVA_POSICION": // Comando que debes asegurar que tu Banco/Servidor envíe
-                // Ejemplo de formato: NUEVA_POSICION RFID_A1B2 8
-                String idMovimiento = partes[1];
-                int pos = Integer.parseInt(partes[2]);
-                ventana.moverFichaGrafica(idMovimiento, pos);
+            case "NUEVA_POSICION":
+                // Formato: NUEVA_POSICION <ID_RFID> <POSICION> <NOMBRE_JUGADOR> <NOMBRE_CASILLA>
+                if (partes.length >= 3) {
+                    String idMovimiento = partes[1];
+                    int pos = Integer.parseInt(partes[2]);
+                    ventana.moverFichaGrafica(idMovimiento, pos);
+                    
+                    if (partes.length >= 5) {
+                        String jug = partes[3];
+                        String nombreCasilla = partes[4].replace("_", " ");
+                        ventana.agregarMensaje("📍 " + jug + " aterrizó en la casilla #" + pos + ": [" + nombreCasilla + "]");
+                        ventana.actualizarInfoCasilla(nombreCasilla + " (Casilla #" + pos + ")", "Casilla especial o de evento");
+                    }
+                }
                 break;
 
             case "ERROR":
@@ -145,6 +192,23 @@ public class Cliente {
                     // Le decimos a la ventana que muestre el pop-up
                     ventana.mostrarPopUpCarta(descripcion, tipoEfecto, valor);
                     ventana.agregarMensaje("📜 Has sacado una Carta de Evento.");
+                }
+                break;
+                
+            case "COMPRA_EXITOSA":
+                // Formato: COMPRA_EXITOSA <RFID> <JUGADOR> <NOMBRE_PROP> <PRECIO>
+                if (partes.length >= 5) {
+                    String rfidComprador = partes[1];
+                    String comprador = partes[2];
+                    String nombreProp = partes[3].replace("_", " ");
+                    String precio = partes[4];
+
+                    ventana.agregarMensaje("✅ ¡" + comprador + " adquirió " + nombreProp + " por $" + precio + "!");
+                    ventana.actualizarInfoCasilla(nombreProp, "Comprada por: " + comprador + " ($" + precio + ")");
+                    
+                    if (this.idRfid.equals(rfidComprador)) {
+                        ventana.bloquearBotones(); // Bloquea los botones si compró con tarjeta RFID
+                    }
                 }
                 break;
                 
